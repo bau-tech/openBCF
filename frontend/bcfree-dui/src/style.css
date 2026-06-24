@@ -1,0 +1,30 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.shell__header {
+  padding: 12px 16px 0;
+}
+
+.shell__header h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.shell__header p {
+  font-size: 12px;
+  color: #6b6b6b;
+  margin: 0;
+}
+
+.shell__body {
+  padding: 16px;
+}
+
+.error {
+  color: #b42318;
+  white-space: pre-wrap;
+}
