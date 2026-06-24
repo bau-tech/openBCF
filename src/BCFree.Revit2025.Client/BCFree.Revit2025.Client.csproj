@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net8.0-windows + UseWPF is required to reference System.Windows.Media.Imaging
+         (BitmapImage) for the ribbon button's PushButtonData.Image/LargeImage, and to host
+         BcfDuiWebView directly. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BCFree.Core\BCFree.Core.csproj" />
+    <ProjectReference Include="..\BCFree.Dui\BCFree.Dui.csproj" />
+    <ProjectReference Include="..\BCFree.Dui.WebView\BCFree.Dui.WebView.csproj" />
+    <!-- Provides RevitAPI.dll/RevitAPIUI.dll for compiling against; Revit itself supplies the
+         real assemblies at runtime, so they must not be copied into our output. -->
+    <PackageReference Include="Speckle.Revit.API" Version="2025.0.0" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="BCFree.Revit2025.Client.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Builds the DUI3 frontend (frontend/bcfree-dui) and copies its compiled output into
+       wwwroot/ alongside this assembly, so BcfDuiPaneProvider's virtual-host mapping can find it
+       without anyone having to remember a separate manual build step. -->
+  <PropertyGroup>
+    <FrontendDir>$(MSBuildThisFileDirectory)..\..\frontend\bcfree-dui</FrontendDir>
+  </PropertyGroup>
+
+  <Target Name="BuildDuiFrontend" BeforeTargets="Build" Inputs="$(FrontendDir)\src\**\*" Outputs="$(FrontendDir)\dist\index.html">
+    <Exec Command="npm install" WorkingDirectory="$(FrontendDir)" Condition="!Exists('$(FrontendDir)\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(FrontendDir)" />
+  </Target>
+
+  <Target Name="CopyDuiFrontend" AfterTargets="Build" DependsOnTargets="BuildDuiFrontend">
+    <ItemGroup>
+      <DuiFrontendDist Include="$(FrontendDir)\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DuiFrontendDist)" DestinationFolder="$(OutDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Revit loads this DLL via Assembly.LoadFrom from a flat deploy folder, not through our own
+       .deps.json, so the WebView2 SDK's normal runtimes/win-x64/native/ RID-probing doesn't kick
+       in - the native loader has to sit directly next to the managed assembly instead. -->
+  <Target Name="FlattenWebView2NativeLoader" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(OutDir)runtimes\win-x64\native\WebView2Loader.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(OutDir)runtimes\win-x64\native\WebView2Loader.dll')" />
+  </Target>
+
+</Project>
