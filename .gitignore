@@ -5,3 +5,6 @@ dist/
 *.user
 .vs/
 *.tsbuildinfo
+installer/Output/
+.scratch/
+*.log

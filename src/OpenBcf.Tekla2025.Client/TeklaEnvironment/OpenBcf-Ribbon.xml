@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<Tab Header="openBCF" IsCollapsed="false" IsUserDefined="true">
+  <SimpleButton
+    X="0"
+    Y="0"
+    Width="4"
+    Height="4"
+    Command="Plugin.CatalogPluginComponentItem?openBCF"
+    Text="openBCF"
+    Icon="BCF-icon.png"
+    ShowText="true"
+    ShowIcon="true"
+    Tooltip="Connect to a BCF server, query issues, or add a new one"
+  />
+</Tab>

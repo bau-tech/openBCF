@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net8.0-windows + UseWPF is required to reference System.Windows.Media.Imaging
+         (BitmapImage) for the ribbon button's PushButtonData.Image/LargeImage, and to host
+         BcfDuiWebView directly. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenBcf.Core\OpenBcf.Core.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui\OpenBcf.Dui.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui.WebView\OpenBcf.Dui.WebView.csproj" />
+    <!-- Provides RevitAPI.dll/RevitAPIUI.dll for compiling against; Revit itself supplies the
+         real assemblies at runtime, so they must not be copied into our output. -->
+    <PackageReference Include="Speckle.Revit.API" Version="2025.0.0" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="OpenBcf.Revit2025.Client.addin" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Resources\BCF-icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Builds the DUI3 frontend (frontend/openbcf-dui) and copies its compiled output into
+       wwwroot/ alongside this assembly, so BcfDuiPaneProvider's virtual-host mapping can find it
+       without anyone having to remember a separate manual build step. -->
+  <PropertyGroup>
+    <FrontendDir>$(MSBuildThisFileDirectory)..\..\frontend\openbcf-dui</FrontendDir>
+  </PropertyGroup>
+
+  <Target Name="BuildDuiFrontend" BeforeTargets="Build" Inputs="$(FrontendDir)\src\**\*" Outputs="$(FrontendDir)\dist\index.html">
+    <Exec Command="npm install" WorkingDirectory="$(FrontendDir)" Condition="!Exists('$(FrontendDir)\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(FrontendDir)" />
+  </Target>
+
+  <Target Name="CopyDuiFrontend" AfterTargets="Build" DependsOnTargets="BuildDuiFrontend">
+    <ItemGroup>
+      <DuiFrontendDist Include="$(FrontendDir)\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DuiFrontendDist)" DestinationFolder="$(OutDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Revit loads this DLL via Assembly.LoadFrom from a flat deploy folder, not through our own
+       .deps.json, so the WebView2 SDK's normal runtimes/win-x64/native/ RID-probing doesn't kick
+       in - the native loader has to sit directly next to the managed assembly instead. -->
+  <Target Name="FlattenWebView2NativeLoader" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(OutDir)runtimes\win-x64\native\WebView2Loader.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(OutDir)runtimes\win-x64\native\WebView2Loader.dll')" />
+  </Target>
+
+  <PropertyGroup>
+    <!-- Revit scans this per-version Addins folder for *.addin manifest files; the existing
+         OpenBcf.Revit2025.Client.addin's <Assembly> path is relative to it. Override
+         RevitAddinsPath (e.g. -p:RevitAddinsPath=...) if Revit should pick this up from
+         %ProgramData% instead, or a different version folder. -->
+    <RevitAddinsPath Condition="'$(RevitAddinsPath)' == ''">$(APPDATA)\Autodesk\Revit\Addins\2025</RevitAddinsPath>
+  </PropertyGroup>
+
+  <!-- Deploys the build output (DLLs, wwwroot, WebView2Loader.dll) into the addin's subfolder,
+       and the manifest itself into the Addins\2025\ folder Revit actually scans - mirrors
+       DeployToTeklaExtensions/DeployTeklaRibbon in OpenBcf.Tekla2025.Client.csproj. Runs on every
+       Build - this is a single-developer-machine convenience, not something to wire into CI. -->
+  <Target Name="DeployToRevitAddins" AfterTargets="Build;CopyDuiFrontend;FlattenWebView2NativeLoader">
+    <ItemGroup>
+      <RevitAddinDeployFiles Include="$(OutDir)**\*" Exclude="$(OutDir)OpenBcf.Revit2025.Client.addin" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RevitAddinDeployFiles)" DestinationFolder="$(RevitAddinsPath)\OpenBcf.Revit2025.Client\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(OutDir)OpenBcf.Revit2025.Client.addin" DestinationFolder="$(RevitAddinsPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
