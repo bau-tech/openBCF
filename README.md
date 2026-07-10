@@ -10,6 +10,12 @@ visible/selected model elements — without needing everyone on the same platfor
 authoring tool. openBCF lets Revit and Tekla users connect to a shared BCF server, browse existing
 issues, and create new ones with a real camera viewpoint captured straight from the model.
 
+## Download
+
+[**Download the installer**](https://github.com/bau-tech/openBCF/releases/latest) — a single
+`openBCF-Setup.exe` that auto-detects Revit 2025 and/or Tekla Structures 2025.0 and installs the
+matching add-in(s). No admin rights required.
+
 ## Status
 
 Personal, in-development project. Functional end-to-end (connect → browse issues → create an
