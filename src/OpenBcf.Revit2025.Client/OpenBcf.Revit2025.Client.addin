@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>openBCF for Revit 2025</Name>
+    <Assembly>OpenBcf.Revit2025.Client\OpenBcf.Revit2025.Client.dll</Assembly>
+    <AddInId>dc4dd100-9039-4363-9b23-86a9fdc5f747</AddInId>
+    <FullClassName>OpenBcf.Revit2025.Client.OpenBcfRevitApplication</FullClassName>
+    <VendorId>OPENBCF</VendorId>
+    <VendorDescription>openBCF</VendorDescription>
+  </AddIn>
+</RevitAddIns>
