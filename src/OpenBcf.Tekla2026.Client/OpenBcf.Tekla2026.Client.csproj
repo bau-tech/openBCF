@@ -1,0 +1,118 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net48 because Tekla Structures 2026 plugins load in-process into Tekla's .NET Framework
+         host (see OpenBcf.Core.csproj). UseWPF hosts BcfDuiWebView; UseWindowsForms hosts it in a
+         floating tool window via ElementHost, since Tekla has no Revit-style dockable pane API. -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Tekla has no public NuGet feed for its Open API; every host project references the
+         assemblies straight out of the installed bin folder. Override TeklaStructuresBinPath
+         (e.g. -p:TeklaStructuresBinPath=... or a local Directory.Build.props.user) if Tekla is
+         installed somewhere other than the default below. -->
+    <TeklaStructuresBinPath Condition="'$(TeklaStructuresBinPath)' == ''">$(ProgramFiles)\Tekla Structures\2026.0\bin</TeklaStructuresBinPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenBcf.Core\OpenBcf.Core.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui\OpenBcf.Dui.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui.WebView\OpenBcf.Dui.WebView.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tekla itself supplies these at runtime from its own bin folder (already on the process's
+         probing path), so they must not be copied into our output - mirrors Speckle.Revit.API's
+         ExcludeAssets="runtime" in OpenBcf.Revit2025.Client.csproj. -->
+    <Reference Include="Tekla.Structures">
+      <HintPath>$(TeklaStructuresBinPath)\Tekla.Structures.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Tekla.Structures.Model">
+      <HintPath>$(TeklaStructuresBinPath)\Tekla.Structures.Model.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Tekla.Structures.Dialog provides PluginFormBase (the plugin dialog base class -
+         BcfDuiHostForm); Tekla.Structures.Plugins provides the [Plugin]/[PluginUserInterface]
+         attributes (see TeklaPlugin.cs) that replace the old macro-based entry point. -->
+    <Reference Include="Tekla.Structures.Dialog">
+      <HintPath>$(TeklaStructuresBinPath)\Tekla.Structures.Dialog.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Tekla.Structures.Plugins">
+      <HintPath>$(TeklaStructuresBinPath)\Tekla.Structures.Plugins.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TeklaEnvironment/ holds the ribbon tab/button XML and icon, deployed as-is (see
+         DeployTeklaRibbon below) alongside the plugin DLL itself - no macro file needed since
+         TeklaPlugin.cs (compiled into this assembly) is the real entry point. -->
+    <None Include="TeklaEnvironment\**\*" />
+  </ItemGroup>
+
+  <!-- Builds the DUI3 frontend (frontend/openbcf-dui) and copies its compiled output into
+       wwwroot/ alongside this assembly, same as OpenBcf.Revit2025.Client.csproj. -->
+  <PropertyGroup>
+    <FrontendDir>$(MSBuildThisFileDirectory)..\..\frontend\openbcf-dui</FrontendDir>
+  </PropertyGroup>
+
+  <Target Name="BuildDuiFrontend" BeforeTargets="Build" Inputs="$(FrontendDir)\src\**\*" Outputs="$(FrontendDir)\dist\index.html">
+    <Exec Command="npm install" WorkingDirectory="$(FrontendDir)" Condition="!Exists('$(FrontendDir)\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(FrontendDir)" />
+  </Target>
+
+  <Target Name="CopyDuiFrontend" AfterTargets="Build" DependsOnTargets="BuildDuiFrontend">
+    <ItemGroup>
+      <DuiFrontendDist Include="$(FrontendDir)\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DuiFrontendDist)" DestinationFolder="$(OutDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Tekla loads plugin DLLs via Assembly.LoadFrom from a flat <Plugins>\<PluginName>\ folder,
+       not through our own .deps.json, so the WebView2 SDK's normal runtimes/win-x64/native/
+       RID-probing doesn't kick in - same issue and same fix as OpenBcf.Revit2025.Client.csproj. -->
+  <Target Name="FlattenWebView2NativeLoader" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(OutDir)runtimes\win-x64\native\WebView2Loader.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(OutDir)runtimes\win-x64\native\WebView2Loader.dll')" />
+  </Target>
+
+  <PropertyGroup>
+    <!-- Tekla's "common" environment root. Override TeklaCommonEnvironmentPath if deploying
+         against a different environment. -->
+    <TeklaCommonEnvironmentPath Condition="'$(TeklaCommonEnvironmentPath)' == ''">C:\ProgramData\Trimble\Tekla Structures\2026.0\Environments\common</TeklaCommonEnvironmentPath>
+  </PropertyGroup>
+
+  <!-- Deploys the build output to Tekla's "common" environment extensions folder - confirmed by
+       the BeamExtruder/Concrete Bridge Reinforcement/Grasshopper/openBCF extensions already
+       installed under here, each under its own %commonEnvFolder%\extensions\<Name>\. By itself
+       this just makes the DLLs loadable; it does not put anything in the UI - see
+       DeployTeklaRibbonAndMacro below for that. Runs on every Build - this is a
+       single-developer-machine convenience, not something to wire into CI. -->
+  <Target Name="DeployToTeklaExtensions" AfterTargets="Build;CopyDuiFrontend;FlattenWebView2NativeLoader">
+    <ItemGroup>
+      <ExtensionDeployFiles Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ExtensionDeployFiles)" DestinationFolder="$(TeklaCommonEnvironmentPath)\extensions\openBCF\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Dropping DLLs into extensions\ (above) makes TeklaPlugin.cs's [Plugin("openBCF")] loadable
+       from Tekla's plugin catalog, but creates no ribbon entry by itself - the ribbon tab/button
+       XML still needs deploying separately, bound to "Plugin.CatalogPluginComponentItem?openBCF"
+       (see TeklaEnvironment/OpenBcf-Ribbon.xml) rather than the old macro command. Requires
+       restarting Tekla Structures to pick up the new ribbon tab. -->
+  <Target Name="DeployTeklaRibbon" AfterTargets="Build">
+    <Copy SourceFiles="TeklaEnvironment\OpenBcf-Ribbon.xml;TeklaEnvironment\BCF-icon.png" DestinationFolder="$(TeklaCommonEnvironmentPath)\system\Ribbons\CustomTabs\Modeling" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
