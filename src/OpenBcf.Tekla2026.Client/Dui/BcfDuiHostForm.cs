@@ -5,11 +5,11 @@ using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using OpenBcf.Dui.Bridge;
 using OpenBcf.Dui.WebView;
-using OpenBcf.Tekla2025.Client.Bindings;
+using OpenBcf.Tekla2026.Client.Bindings;
 using Tekla.Structures.Dialog;
 using Tekla.Structures.Model.Operations;
 
-namespace OpenBcf.Tekla2025.Client.Dui;
+namespace OpenBcf.Tekla2026.Client.Dui;
 
 /// <summary>
 /// Hosts <see cref="BcfDuiWebView"/> (the shared control every host eventually embeds) in a
