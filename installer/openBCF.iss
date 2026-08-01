@@ -1,13 +1,17 @@
 ; openBCF installer - packages the Release build output of the Revit and Tekla clients and
 ; deploys them straight into each host application's real plugin location (Revit's per-user
 ; Addins\2025 folder, Tekla's machine-wide common environment folder) - the same locations
-; OpenBcf.Revit2025.Client.csproj / OpenBcf.Tekla2025.Client.csproj deploy to automatically on
-; every dev build (see their DeployToRevitAddins / DeployToTeklaExtensions targets). Neither
-; product installs under {app}; {app} only exists to host the uninstaller.
+; OpenBcf.Revit2025.Client.csproj / OpenBcf.Tekla2025.Client.csproj / OpenBcf.Tekla2026.Client.csproj
+; deploy to automatically on every dev build (see their DeployToRevitAddins /
+; DeployToTeklaExtensions targets). Neither product installs under {app}; {app} only exists to
+; host the uninstaller.
 ;
-; Build Release output for both clients before compiling this script:
+; Build Release output for all three clients before compiling this script:
 ;   dotnet build ..\src\OpenBcf.Revit2025.Client\OpenBcf.Revit2025.Client.csproj -c Release
 ;   dotnet build ..\src\OpenBcf.Tekla2025.Client\OpenBcf.Tekla2025.Client.csproj -c Release
+;   dotnet build ..\src\OpenBcf.Tekla2026.Client\OpenBcf.Tekla2026.Client.csproj -c Release
+; (the Tekla builds need a real Tekla Structures install, or -p:TeklaStructuresBinPath pointed at
+; the matching version's SDK assemblies, to compile - see OpenBcf.Tekla2026.Client.csproj)
 ; then compile with Inno Setup 6 (ISCC.exe openBCF.iss).
 
 #define MyAppName "openBCF"
@@ -49,7 +53,8 @@ Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
 Name: "revit"; Description: "Revit 2025 add-in"; Types: full custom
-Name: "tekla"; Description: "Tekla Structures 2025.0 plugin"; Types: full custom
+Name: "tekla2025"; Description: "Tekla Structures 2025.0 plugin"; Types: full custom
+Name: "tekla2026"; Description: "Tekla Structures 2026.0 plugin"; Types: full custom
 
 [Files]
 ; --- Revit 2025 add-in ---
@@ -62,17 +67,28 @@ Source: "..\src\OpenBcf.Revit2025.Client\bin\Release\net8.0-windows\*"; \
 Source: "..\src\OpenBcf.Revit2025.Client\bin\Release\net8.0-windows\OpenBcf.Revit2025.Client.addin"; \
   DestDir: "{code:GetRevitAddinsDir}"; Flags: ignoreversion; Components: revit
 
-; --- Tekla Structures 2025.0 plugin ---
-; DLLs land in the common environment's extensions\openBCF\ folder (makes the [Plugin("openBCF")]
-; loadable); the ribbon tab XML + icon land in CustomTabs\Modeling\ separately (makes it show up
-; in the UI - see TeklaPlugin.cs / TeklaEnvironment\OpenBcf-Ribbon.xml for why these are split).
+; --- Tekla Structures 2025.0 / 2026.0 plugins ---
+; DLLs land in each version's own common environment's extensions\openBCF\ folder (makes the
+; [Plugin("openBCF")] loadable); the ribbon tab XML + icon land in CustomTabs\Modeling\ separately
+; (makes it show up in the UI - see TeklaPlugin.cs / TeklaEnvironment\OpenBcf-Ribbon.xml for why
+; these are split). GetTeklaExtensionsDir/GetTeklaRibbonDir take the Tekla version string
+; ("2025.0"/"2026.0") via Inno's {code:Func|Param} syntax since the two versions deploy to
+; separate, version-numbered ProgramData folders.
 Source: "..\src\OpenBcf.Tekla2025.Client\bin\Release\net48\*"; \
-  DestDir: "{code:GetTeklaExtensionsDir}\openBCF"; \
-  Flags: recursesubdirs createallsubdirs ignoreversion; Components: tekla
+  DestDir: "{code:GetTeklaExtensionsDir|2025.0}\openBCF"; \
+  Flags: recursesubdirs createallsubdirs ignoreversion; Components: tekla2025
 Source: "..\src\OpenBcf.Tekla2025.Client\TeklaEnvironment\OpenBcf-Ribbon.xml"; \
-  DestDir: "{code:GetTeklaRibbonDir}"; Flags: ignoreversion; Components: tekla
+  DestDir: "{code:GetTeklaRibbonDir|2025.0}"; Flags: ignoreversion; Components: tekla2025
 Source: "..\src\OpenBcf.Tekla2025.Client\TeklaEnvironment\BCF-icon.png"; \
-  DestDir: "{code:GetTeklaRibbonDir}"; Flags: ignoreversion; Components: tekla
+  DestDir: "{code:GetTeklaRibbonDir|2025.0}"; Flags: ignoreversion; Components: tekla2025
+
+Source: "..\src\OpenBcf.Tekla2026.Client\bin\Release\net48\*"; \
+  DestDir: "{code:GetTeklaExtensionsDir|2026.0}\openBCF"; \
+  Flags: recursesubdirs createallsubdirs ignoreversion; Components: tekla2026
+Source: "..\src\OpenBcf.Tekla2026.Client\TeklaEnvironment\OpenBcf-Ribbon.xml"; \
+  DestDir: "{code:GetTeklaRibbonDir|2026.0}"; Flags: ignoreversion; Components: tekla2026
+Source: "..\src\OpenBcf.Tekla2026.Client\TeklaEnvironment\BCF-icon.png"; \
+  DestDir: "{code:GetTeklaRibbonDir|2026.0}"; Flags: ignoreversion; Components: tekla2026
 
 [Icons]
 Name: "{group}\Uninstall openBCF"; Filename: "{uninstallexe}"
@@ -83,19 +99,19 @@ begin
   Result := ExpandConstant('{userappdata}\Autodesk\Revit\Addins\2025');
 end;
 
-function GetTeklaCommonEnvDir(Param: String): String;
+function GetTeklaCommonEnvDir(Version: String): String;
 begin
-  Result := ExpandConstant('{commonappdata}\Trimble\Tekla Structures\2025.0\Environments\common');
+  Result := ExpandConstant('{commonappdata}\Trimble\Tekla Structures\' + Version + '\Environments\common');
 end;
 
-function GetTeklaExtensionsDir(Param: String): String;
+function GetTeklaExtensionsDir(Version: String): String;
 begin
-  Result := GetTeklaCommonEnvDir('') + '\extensions';
+  Result := GetTeklaCommonEnvDir(Version) + '\extensions';
 end;
 
-function GetTeklaRibbonDir(Param: String): String;
+function GetTeklaRibbonDir(Version: String): String;
 begin
-  Result := GetTeklaCommonEnvDir('') + '\system\Ribbons\CustomTabs\Modeling';
+  Result := GetTeklaCommonEnvDir(Version) + '\system\Ribbons\CustomTabs\Modeling';
 end;
 
 function RevitDetected(): Boolean;
@@ -103,9 +119,9 @@ begin
   Result := DirExists(ExpandConstant('{pf64}\Autodesk\Revit 2025'));
 end;
 
-function TeklaDetected(): Boolean;
+function TeklaVersionDetected(Version: String): Boolean;
 begin
-  Result := DirExists(ExpandConstant('{pf64}\Tekla Structures\2025.0')) or DirExists(GetTeklaCommonEnvDir(''));
+  Result := DirExists(ExpandConstant('{pf64}\Tekla Structures\' + Version)) or DirExists(GetTeklaCommonEnvDir(Version));
 end;
 
 procedure InitializeWizard();
@@ -115,21 +131,29 @@ begin
   Selected := '';
   if RevitDetected() then
     Selected := Selected + 'revit';
-  if TeklaDetected() then
+  if TeklaVersionDetected('2025.0') then
   begin
     if Selected <> '' then
       Selected := Selected + ',';
-    Selected := Selected + 'tekla';
+    Selected := Selected + 'tekla2025';
   end;
-  // Leaves both unchecked if neither is detected, rather than blindly installing into folders
-  // for products that aren't there - NextButtonClick below still lets the user force it manually.
+  if TeklaVersionDetected('2026.0') then
+  begin
+    if Selected <> '' then
+      Selected := Selected + ',';
+    Selected := Selected + 'tekla2026';
+  end;
+  // Leaves everything unchecked if nothing is detected, rather than blindly installing into
+  // folders for products that aren't there - NextButtonClick below still lets the user force it
+  // manually.
   WizardSelectComponents(Selected);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
-  if (CurPageID = wpSelectComponents) and (not WizardIsComponentSelected('revit')) and (not WizardIsComponentSelected('tekla')) then
+  if (CurPageID = wpSelectComponents) and (not WizardIsComponentSelected('revit'))
+    and (not WizardIsComponentSelected('tekla2025')) and (not WizardIsComponentSelected('tekla2026')) then
   begin
     MsgBox('Select at least one component to install.', mbError, MB_OK);
     Result := False;
@@ -140,8 +164,8 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpSelectComponents then
   begin
-    if (not RevitDetected()) and (not TeklaDetected()) then
-      MsgBox('Neither Revit 2025 nor Tekla Structures 2025.0 was detected on this machine.' + #13#10 +
+    if (not RevitDetected()) and (not TeklaVersionDetected('2025.0')) and (not TeklaVersionDetected('2026.0')) then
+      MsgBox('Neither Revit 2025 nor Tekla Structures 2025.0/2026.0 was detected on this machine.' + #13#10 +
         'You can still select a component to install it anyway (e.g. to prepare ahead of installing the host application).',
         mbInformation, MB_OK);
   end;
