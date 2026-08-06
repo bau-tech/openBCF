@@ -1,0 +1,25 @@
+schema_version = "1.0.0"
+
+id = "openbcf"
+version = "0.1.0"
+name = "openBCF"
+tagline = "Connect to a BCF server to browse and create coordination issues"
+maintainer = "openBCF"
+type = "add-on"
+
+website = "https://github.com/bau-tech/openBCF"
+
+# Extensions platform minimum is 4.2.0; this add-on has been developed and tested against
+# Blender 5.2.0 LTS specifically (see project memory/README) but uses no 5.2-only API.
+blender_version_min = "4.2.0"
+
+license = [
+    "SPDX:MIT",
+]
+
+# No wheels: the BCF REST client (bcf_client.py) deliberately uses only Python's standard library
+# (urllib.request/json/base64) rather than "requests" or similar, so nothing needs bundling here.
+
+[permissions]
+network = "Connect to a BCF REST API server to sync coordination issues"
+files = "Save a temporary PNG when capturing a viewpoint snapshot"
