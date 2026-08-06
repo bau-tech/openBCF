@@ -8,3 +8,5 @@ dist/
 installer/Output/
 .scratch/
 *.log
+__pycache__/
+*.pyc

@@ -1,0 +1,125 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net48 because RhinoWindows.dll (WpfElementHost, the panel-hosting bridge) only ships
+         alongside the net48 RhinoCommon.dll in Rhino 8's install (System\), not the parallel
+         System\netcore\ one Rhino 8 also ships for .NET 8 plugins - confirmed by checking the
+         actual install folder rather than assuming. Rhino 8 (and 7) both still load net48
+         plugins, so this isn't a compatibility loss. UseWPF hosts BcfDuiWebView; RhinoWindows'
+         WpfElementHost (not WinForms' ElementHost, unlike Tekla) bridges it into a native Rhino
+         panel, since Rhino's own panel framework expects an IWin32Window, which plain WPF
+         controls don't implement on their own. -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- RhinoWindows.Controls.WpfElementHost (see Dui/BcfDuiPanelHost.cs) derives from
+         System.Windows.Forms.Integration.ElementHost - confirmed via reflection against the
+         installed RhinoWindows.dll - so WinForms needs to be available too, same as Tekla. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Rhino's plugin loader scans its Plug-ins folder for *.rhp files specifically - a renamed
+         .dll, not a separate build step. -->
+    <TargetExt>.rhp</TargetExt>
+    <!-- PlugIn.Icon(Size) (the icon Rhino shows in Options > Plug-ins) reads the assembly's own
+         native Win32 icon resource, not a virtual C# override - confirmed non-virtual via
+         reflection against RhinoCommon.dll. ApplicationIcon embeds one via /win32icon at compile
+         time even though this project's OutputType is a class library, the same shared installer
+         icon every other client uses. -->
+    <ApplicationIcon>..\..\installer\assets\openBCF.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Rhino has no NuGet feed for RhinoCommon/RhinoWindows matching the exact installed build
+         (same situation as Tekla's Open API) - reference the assemblies straight out of the
+         installed Rhino 8 folder. Override RhinoSystemPath if Rhino is installed elsewhere. -->
+    <RhinoSystemPath Condition="'$(RhinoSystemPath)' == ''">$(ProgramFiles)\Rhino 8\System</RhinoSystemPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenBcf.Core\OpenBcf.Core.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui\OpenBcf.Dui.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui.WebView\OpenBcf.Dui.WebView.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Rhino itself supplies these at runtime from its own System folder (already on the
+         process's probing path) - must not be copied into our output, mirrors Tekla's
+         ExcludeAssets="runtime"/Private=false pattern for the same reason. -->
+    <Reference Include="RhinoCommon">
+      <HintPath>$(RhinoSystemPath)\RhinoCommon.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- RhinoWindows.RhinoWindows.Controls.WpfElementHost is the officially-provided bridge that
+         lets a plain WPF FrameworkElement (BcfDuiWebView) implement IWin32Window, which Rhino's
+         panel framework (Rhino.UI.Panels.RegisterPanel) requires - see Dui/BcfDuiPanelHost.cs. -->
+    <Reference Include="RhinoWindows">
+      <HintPath>$(RhinoSystemPath)\RhinoWindows.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Rhino.UI">
+      <HintPath>$(RhinoSystemPath)\Rhino.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Resources\BCF-icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Embedded (not just linked as a file) so RhinoPlugin.cs can load it at runtime via
+         Assembly.GetManifestResourceStream for Panels.RegisterPanel's icon parameter - the panel
+         tab icon is a separate thing from the assembly's own Win32 icon (ApplicationIcon above). -->
+    <EmbeddedResource Include="..\..\installer\assets\openBCF.ico" Link="Resources\openBCF.ico" />
+  </ItemGroup>
+
+  <!-- Builds the DUI3 frontend (frontend/openbcf-dui) and copies its compiled output into
+       wwwroot/ alongside this assembly, same as every other client. -->
+  <PropertyGroup>
+    <FrontendDir>$(MSBuildThisFileDirectory)..\..\frontend\openbcf-dui</FrontendDir>
+  </PropertyGroup>
+
+  <Target Name="BuildDuiFrontend" BeforeTargets="Build" Inputs="$(FrontendDir)\src\**\*" Outputs="$(FrontendDir)\dist\index.html">
+    <Exec Command="npm install" WorkingDirectory="$(FrontendDir)" Condition="!Exists('$(FrontendDir)\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(FrontendDir)" />
+  </Target>
+
+  <Target Name="CopyDuiFrontend" AfterTargets="Build" DependsOnTargets="BuildDuiFrontend">
+    <ItemGroup>
+      <DuiFrontendDist Include="$(FrontendDir)\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DuiFrontendDist)" DestinationFolder="$(OutDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Rhino loads .rhp plugins via Assembly.LoadFrom from a flat Plug-ins\<name>\ folder, not
+       through our own .deps.json, so the WebView2 SDK's normal runtimes/win-x64/native/
+       RID-probing doesn't kick in - same issue and same fix as every other .rhp/add-in-style
+       client in this repo. -->
+  <Target Name="FlattenWebView2NativeLoader" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(OutDir)runtimes\win-x64\native\WebView2Loader.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(OutDir)runtimes\win-x64\native\WebView2Loader.dll')" />
+  </Target>
+
+  <PropertyGroup>
+    <!-- Rhino 8's per-user plugin folder. Confirmed live (via process module inspection, not
+         assumption) that Rhino only auto-loads folders named "<name> (<plugin-guid>)" - every
+         real installed plugin here (Speckle.Connectors.Rhino8 (2153799A-...), 3Dconnexion 3D
+         Mouse (dca0db8d-...), etc.) follows this pattern; a plain "OpenBcf.Rhino8.Client" folder
+         with no (guid) suffix was silently never scanned. The guid here must match RhinoPlugin's
+         [Guid] attribute (RhinoPlugin.cs). Override RhinoPluginsPath if targeting a different
+         Rhino major version's folder. -->
+    <RhinoPluginsPath Condition="'$(RhinoPluginsPath)' == ''">$(APPDATA)\McNeel\Rhinoceros\8.0\Plug-ins\OpenBcf.Rhino8.Client (FC15C4D1-F0BF-49E5-AA7D-B6692D79B056)</RhinoPluginsPath>
+  </PropertyGroup>
+
+  <!-- Deploys the build output (the .rhp itself, wwwroot, WebView2Loader.dll) into Rhino's
+       per-user plugin folder - restart Rhino to pick up changes, same single-developer-machine
+       convenience as every other client's deploy target. -->
+  <Target Name="DeployToRhinoPlugins" AfterTargets="Build;CopyDuiFrontend;FlattenWebView2NativeLoader">
+    <ItemGroup>
+      <RhinoPluginDeployFiles Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RhinoPluginDeployFiles)" DestinationFolder="$(RhinoPluginsPath)\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

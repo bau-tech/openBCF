@@ -1,17 +1,19 @@
-; openBCF installer - packages the Release build output of the Revit and Tekla clients and
+; openBCF installer - packages the Release build output of the Revit, Tekla, and Rhino clients and
 ; deploys them straight into each host application's real plugin location (Revit's per-user
-; Addins\2025 folder, Tekla's machine-wide common environment folder) - the same locations
-; OpenBcf.Revit2025.Client.csproj / OpenBcf.Tekla2025.Client.csproj / OpenBcf.Tekla2026.Client.csproj
-; deploy to automatically on every dev build (see their DeployToRevitAddins /
-; DeployToTeklaExtensions targets). Neither product installs under {app}; {app} only exists to
-; host the uninstaller.
+; Addins\2025 folder, Tekla's machine-wide common environment folder, Rhino's per-user Plug-ins
+; folder) - the same locations OpenBcf.Revit2025.Client.csproj / OpenBcf.Tekla2025.Client.csproj /
+; OpenBcf.Tekla2026.Client.csproj / OpenBcf.Rhino8.Client.csproj deploy to automatically on every
+; dev build (see their DeployToRevitAddins / DeployToTeklaExtensions / DeployToRhinoPlugins
+; targets). None of these products install under {app}; {app} only exists to host the uninstaller.
 ;
-; Build Release output for all three clients before compiling this script:
+; Build Release output for the .NET clients before compiling this script:
 ;   dotnet build ..\src\OpenBcf.Revit2025.Client\OpenBcf.Revit2025.Client.csproj -c Release
 ;   dotnet build ..\src\OpenBcf.Tekla2025.Client\OpenBcf.Tekla2025.Client.csproj -c Release
 ;   dotnet build ..\src\OpenBcf.Tekla2026.Client\OpenBcf.Tekla2026.Client.csproj -c Release
+;   dotnet build ..\src\OpenBcf.Rhino8.Client\OpenBcf.Rhino8.Client.csproj -c Release
 ; (the Tekla builds need a real Tekla Structures install, or -p:TeklaStructuresBinPath pointed at
-; the matching version's SDK assemblies, to compile - see OpenBcf.Tekla2026.Client.csproj)
+; the matching version's SDK assemblies, to compile - see OpenBcf.Tekla2026.Client.csproj; the
+; Rhino build needs a real Rhino 8 install, or -p:RhinoSystemPath pointed at its System folder)
 ; then compile with Inno Setup 6 (ISCC.exe openBCF.iss).
 
 #define MyAppName "openBCF"
@@ -23,7 +25,7 @@ AppId={{67EFA528-C91C-4A69-AFEE-673EAACA549E}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppComments=Open BCF client for Revit and Tekla Structures
+AppComments=Open BCF client for Revit, Tekla Structures, and Rhino
 VersionInfoDescription=openBCF Setup
 DefaultDirName={autopf}\openBCF
 DefaultGroupName=openBCF
@@ -55,6 +57,7 @@ Name: "custom"; Description: "Custom installation"; Flags: iscustom
 Name: "revit"; Description: "Revit 2025 add-in"; Types: full custom
 Name: "tekla2025"; Description: "Tekla Structures 2025.0 plugin"; Types: full custom
 Name: "tekla2026"; Description: "Tekla Structures 2026.0 plugin"; Types: full custom
+Name: "rhino8"; Description: "Rhino 8 plug-in"; Types: full custom
 
 [Files]
 ; --- Revit 2025 add-in ---
@@ -90,6 +93,15 @@ Source: "..\src\OpenBcf.Tekla2026.Client\TeklaEnvironment\OpenBcf-Ribbon.xml"; \
 Source: "..\src\OpenBcf.Tekla2026.Client\TeklaEnvironment\BCF-icon.png"; \
   DestDir: "{code:GetTeklaRibbonDir|2026.0}"; Flags: ignoreversion; Components: tekla2026
 
+; --- Rhino 8 plug-in ---
+; Rhino only auto-loads per-user plugin folders named "<name> (<plugin-guid>)" - confirmed live
+; via process module inspection, not assumption (see RhinoPlugin.cs's [Guid] attribute, which
+; this folder's guid must match) - same shape as OpenBcf.Rhino8.Client.csproj's own
+; DeployToRhinoPlugins dev-build target.
+Source: "..\src\OpenBcf.Rhino8.Client\bin\Release\net48\*"; \
+  DestDir: "{code:GetRhinoPluginsDir}\OpenBcf.Rhino8.Client (FC15C4D1-F0BF-49E5-AA7D-B6692D79B056)"; \
+  Flags: recursesubdirs createallsubdirs ignoreversion; Components: rhino8
+
 [Icons]
 Name: "{group}\Uninstall openBCF"; Filename: "{uninstallexe}"
 
@@ -114,6 +126,11 @@ begin
   Result := GetTeklaCommonEnvDir(Version) + '\system\Ribbons\CustomTabs\Modeling';
 end;
 
+function GetRhinoPluginsDir(Param: String): String;
+begin
+  Result := ExpandConstant('{userappdata}\McNeel\Rhinoceros\8.0\Plug-ins');
+end;
+
 function RevitDetected(): Boolean;
 begin
   Result := DirExists(ExpandConstant('{pf64}\Autodesk\Revit 2025'));
@@ -122,6 +139,11 @@ end;
 function TeklaVersionDetected(Version: String): Boolean;
 begin
   Result := DirExists(ExpandConstant('{pf64}\Tekla Structures\' + Version)) or DirExists(GetTeklaCommonEnvDir(Version));
+end;
+
+function RhinoDetected(): Boolean;
+begin
+  Result := DirExists(ExpandConstant('{pf64}\Rhino 8'));
 end;
 
 procedure InitializeWizard();
@@ -143,6 +165,12 @@ begin
       Selected := Selected + ',';
     Selected := Selected + 'tekla2026';
   end;
+  if RhinoDetected() then
+  begin
+    if Selected <> '' then
+      Selected := Selected + ',';
+    Selected := Selected + 'rhino8';
+  end;
   // Leaves everything unchecked if nothing is detected, rather than blindly installing into
   // folders for products that aren't there - NextButtonClick below still lets the user force it
   // manually.
@@ -153,7 +181,8 @@ function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
   if (CurPageID = wpSelectComponents) and (not WizardIsComponentSelected('revit'))
-    and (not WizardIsComponentSelected('tekla2025')) and (not WizardIsComponentSelected('tekla2026')) then
+    and (not WizardIsComponentSelected('tekla2025')) and (not WizardIsComponentSelected('tekla2026'))
+    and (not WizardIsComponentSelected('rhino8')) then
   begin
     MsgBox('Select at least one component to install.', mbError, MB_OK);
     Result := False;
@@ -164,8 +193,9 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpSelectComponents then
   begin
-    if (not RevitDetected()) and (not TeklaVersionDetected('2025.0')) and (not TeklaVersionDetected('2026.0')) then
-      MsgBox('Neither Revit 2025 nor Tekla Structures 2025.0/2026.0 was detected on this machine.' + #13#10 +
+    if (not RevitDetected()) and (not TeklaVersionDetected('2025.0')) and (not TeklaVersionDetected('2026.0'))
+      and (not RhinoDetected()) then
+      MsgBox('Neither Revit 2025, Tekla Structures 2025.0/2026.0, nor Rhino 8 was detected on this machine.' + #13#10 +
         'You can still select a component to install it anyway (e.g. to prepare ahead of installing the host application).',
         mbInformation, MB_OK);
   end;
@@ -173,7 +203,7 @@ end;
 
 function InitializeUninstall(): Boolean;
 begin
-  MsgBox('If Revit or Tekla Structures is currently running, close it first so the add-in files can be removed.',
+  MsgBox('If Revit, Tekla Structures, or Rhino is currently running, close it first so the add-in files can be removed.',
     mbInformation, MB_OK);
   Result := True;
 end;
