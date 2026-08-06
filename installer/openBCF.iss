@@ -17,7 +17,7 @@
 ; then compile with Inno Setup 6 (ISCC.exe openBCF.iss).
 
 #define MyAppName "openBCF"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "openBCF"
 
 [Setup]
