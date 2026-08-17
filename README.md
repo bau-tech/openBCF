@@ -1,6 +1,6 @@
 # openBCF
 
-A free, open BCF (BIM Collaboration Format) client for Revit, Tekla Structures, Rhino,
+A free, open BCF (BIM Collaboration Format) client for Revit, Tekla Structures, Rhino, ArchiCAD,
 and Blender (via [Bonsai](https://bonsaibim.org)), built against the
 [buildingSMART BCF REST API](https://github.com/buildingSMART/BCF-API) so it works against any
 compliant BCF server rather than a single vendor's platform.
@@ -8,7 +8,7 @@ compliant BCF server rather than a single vendor's platform.
 BCF is the open standard BIM tools use to exchange coordination issues ("topics") — a title,
 status, comments, and a 3D viewpoint/snapshot pinned to a specific camera position and set of
 visible/selected model elements — without needing everyone on the same platform or the same
-authoring tool. openBCF lets Revit, Tekla, Rhino, and Blender/Bonsai users connect to a
+authoring tool. openBCF lets Revit, Tekla, Rhino, ArchiCAD, and Blender/Bonsai users connect to a
 shared BCF server, browse existing issues, and create new ones with a viewpoint captured straight
 from the model.
 
@@ -16,8 +16,13 @@ from the model.
 
 [**Download the installer**](https://github.com/bau-tech/openBCF/releases/latest) — a single
 `openBCF-Setup.exe` that auto-detects Revit 2025, Tekla Structures 2025.0/2026.0, and/or Rhino 8
-and installs the matching add-in(s). Windows only (Revit, Tekla, and this Rhino build don't run on
-macOS). No admin rights required.
+and installs the matching add-in(s). Windows only (Revit, Tekla, this Rhino build, and the
+ArchiCAD 29 add-on don't run on macOS). No admin rights required.
+
+The ArchiCAD 29 add-on (`src/OpenBcf.ArchiCad29.NativeAddOn` + `src/OpenBcf.ArchiCad29.Helper`)
+isn't part of `openBCF-Setup.exe` yet — it needs a native build against the real ArchiCAD API
+DevKit that the installer doesn't do (see "Why the ArchiCAD client is different" below); build it
+by hand for now.
 
 The Blender/Bonsai extension (`src/OpenBcf.Blender.Extension`) is cross-platform (Windows, macOS,
 Linux) and isn't part of `openBCF-Setup.exe` either — see "Building & deploying" below for the
@@ -45,6 +50,8 @@ same "DUI3" pattern [Speckle](https://speckle.systems/) uses for its own multi-h
 | `src/OpenBcf.Tekla2025.Client` | net48 | Tekla Structures 2025.0 plugin (`[Plugin("openBCF")]`, catalog-based, real ribbon entry): floating WebView2 tool window, viewpoint capture/apply against Tekla's `ViewHandler`/`ViewCamera`. |
 | `src/OpenBcf.Tekla2026.Client` | net48 | Same as above, built against Tekla Structures 2026.0's Open API assemblies. |
 | `src/OpenBcf.Rhino8.Client` | net48 (`.rhp`) | Rhino 8 plug-in: a dockable WPF panel (`RhinoWindows.Controls.WpfElementHost` bridging `BcfDuiWebView` into Rhino's panel framework), opened via the `openBCF` command; viewpoint capture/apply against `RhinoViewport`'s camera and `RhinoObject` selection. |
+| `src/OpenBcf.ArchiCad29.NativeAddOn` | C++ (ACAPI, native `.apx`) | ArchiCAD 29 Add-On: top-level `openBCF` menu, a native palette hosting ArchiCAD's own `DG::Browser` control pointed at a local HTTP server, and named-pipe IPC to the out-of-process helper below — no shared code with the other clients' host layer at all (see "Why the ArchiCAD client is different" below). |
+| `src/OpenBcf.ArchiCad29.Helper` | net8.0-windows | A separate, headless `OpenBcf.ArchiCad29.Helper.exe`: owns `OpenBcf.Core`/`OpenBcf.Dui` and a static file server for the DUI3 frontend, launched by the native Add-On and outliving its DLL being unloaded/reloaded. Reaches ACAPI (camera/selection/snapshot) over a named pipe instead of a host SDK, since ArchiCAD exposes none to managed code. |
 | `src/OpenBcf.Blender.Extension` | Python (Blender 4.2+ extension) | A Blender Add-On (Extensions Platform `blender_manifest.toml`) with a **from-scratch, pure-Python BCF REST client and native `bpy` UI** — no shared code with the .NET clients at all (see "Why the Blender client is different" below). Uses [Bonsai](https://bonsaibim.org) for IFC-aware selection. |
 
 The Revit/Tekla/Rhino clients all reference the same `OpenBcf.Core`/`OpenBcf.Dui`/`OpenBcf.Dui.WebView`
@@ -52,6 +59,52 @@ projects and the same built frontend — the only per-host code is the thin bind
 (`Bindings/`) and viewpoint capture/apply, since each host exposes the active view/camera/selection
 through a completely different API. Rhino's panel-hosting differs slightly (`WpfElementHost`
 instead of a dockable pane or floating `ElementHost`-wrapped window), but the pattern is the same.
+
+### Why the ArchiCAD client is different
+
+ArchiCAD's Add-On API (ACAPI) is native C/C++ only — unlike Revit/Tekla/Rhino, there is no managed
+hosting story at all, so `OpenBcf.Core`/`OpenBcf.Dui`/`OpenBcf.Dui.WebView` can't be referenced
+directly the way the other three clients do it. An early version of this client hosted the .NET
+runtime **in-process** via hostfxr, but that couldn't survive ArchiCAD's real behavior of cycling
+`Initialize`/`FreeData` (effectively unloading and reloading the Add-On DLL) independently of
+anything the Add-On itself does — a hosted CoreCLR runtime doesn't tolerate its own module being
+unloaded out from under it. A second attempt kept .NET in-process but tried reparenting a
+WPF/WebView2 window into ArchiCAD's native palette across the process boundary, which deadlocked
+ArchiCAD outright (a cross-process `SetParent` needs a synchronous `SendMessage` that blocked
+forever against ArchiCAD's own main thread). The client is now split across two projects, out of
+process entirely, matching how [Speckle's real ArchiCAD
+connector](https://github.com/specklesystems/speckle-cpp-connectors) does it:
+
+- `src/OpenBcf.ArchiCad29.NativeAddOn` — a plain native `.apx`, built with the CMake project shape
+  Graphisoft's own [archicad-api-devkit](https://github.com/GRAPHISOFT/archicad-api-devkit)
+  provides. It registers a top-level `openBCF` main menu and a palette hosting ArchiCAD's own
+  `DG::Browser` control (not WebView2) pointed at a local HTTP server the helper below serves —
+  never embedding a foreign-process window at all.
+- `src/OpenBcf.ArchiCad29.Helper` — a separate, headless `OpenBcf.ArchiCad29.Helper.exe`, launched
+  by the native Add-On next to its own `.apx` and outliving any number of that DLL's
+  unload/reload cycles. It owns `OpenBcf.Core`/`OpenBcf.Dui`, serves the built DUI3 frontend over
+  local HTTP, and talks to the native side over two named pipes: a "bridge" pipe (this process is
+  the server, carrying binding calls like Connect/CreateTopic) and a "callbacks" pipe (the native
+  Add-On is the server, carrying ACAPI-only requests like camera/selection/snapshot access, since
+  managed code has no way to call ACAPI itself). Both pipes use pumped, non-blocking I/O
+  specifically because ACAPI's own "asynchronous" JS callbacks actually run on ArchiCAD's main
+  thread, so a plain blocking read would deadlock the moment either side needs to call back into
+  the other mid-request.
+
+**Verification status**: built and deployed for real against a live ArchiCAD 29 install (CMake +
+MSVC Build Tools, DevKit release matched to the installed build's exact version), with a real
+GRAPHISOFT Developer ID and Add-On-specific local ID (both self-service dead ends — `0`/`1`
+placeholders and even a self-picked real-looking ID are rejected identically; the local ID must be
+generated by GRAPHISOFT's own developer portal). Live-confirmed working end to end: the palette
+loads and opens from the new top-level menu, Connect/browse/Create New Issue (including capturing
+a snapshot — note this uses ACAPI's own photorealistic renderer, so it can take several seconds and
+visibly freeze ArchiCAD while it runs), and offline `.bcfzip` Export/Import, whose native file
+dialogs needed their own fixes (`Microsoft.Win32.SaveFileDialog` requires a genuine STA thread the
+helper's pipe-handling thread doesn't have by default, and needs an explicit topmost owner window
+or it opens behind ArchiCAD since a background process has no foreground-activation rights). Still
+unverified for a different reason (no DevKit example covers either): the exact sign/axis
+conventions in the 3D camera math, and whether richer viewpoint data round-trips through every BCF
+server the same way it does through the project's own test server.
 
 ### Why the Blender client is different
 
@@ -149,9 +202,32 @@ assembly showed there's no absolute frustum/FOV setter at all, only `Camera35mmL
 instead. The project builds cleanly (Debug and Release) and deploys to Rhino's real plugin folder,
 but hasn't yet been loaded inside a running Rhino session.
 
+**Building the ArchiCAD 29 client**: the managed helper builds and publishes like any other .NET
+project —
+
+```powershell
+dotnet publish src/OpenBcf.ArchiCad29.Helper -c Release -r win-x64 --self-contained false
+```
+
+— and needs nothing beyond the .NET 8 SDK/Node.js/npm, unlike the other clients' host SDKs. The
+native `.apx` half needs the real ArchiCAD 29 API DevKit (not vendored here — matched to your
+installed ArchiCAD's exact build number, not just its major version) and CMake + MSVC Build Tools:
+
+```powershell
+cmake -S src/OpenBcf.ArchiCad29.NativeAddOn -B build -G "Visual Studio 17 2022" -A x64 `
+  -DAC_API_DEVKIT_DIR="C:\Path\To\API-Development-Kit-29"
+cmake --build build --config Release
+```
+
+This produces `openBCF.apx` (with the helper's publish output copied next to it automatically) —
+copy both into ArchiCAD's `Add-Ons\Local\` folder (`C:\Program Files\Graphisoft\Archicad 29\Add-Ons\Local\`
+by default). See `src/OpenBcf.ArchiCad29.NativeAddOn/README.md` for the full DevKit setup and MDID
+registration steps — a real GRAPHISOFT Developer ID is required even for local testing.
+
 **Requirements**: .NET 8 SDK, Node.js/npm, and whichever of Revit 2025 / Tekla Structures 2025.0 or
 2026.0 you're building against (the Tekla clients compile against Tekla's Open API assemblies
-directly from its install folder — no NuGet feed exists for those).
+directly from its install folder — no NuGet feed exists for those). The ArchiCAD 29 add-on's native
+half additionally needs the ArchiCAD 29 API DevKit and CMake (see above).
 
 `OpenBcf.Blender.Extension` needs no compilation at all (pure Python, no OS-specific code) — build
 and install it with Blender's own extension command-line tools, which work identically on Windows,

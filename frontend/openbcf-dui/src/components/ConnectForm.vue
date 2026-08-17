@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { callBinding, onBindingEvent } from '../bridge'
 import bcfIcon from '../assets/bcf-icon.png'
-import type { BcfProjectOption, ConnectResult } from '../types'
+import type { BcfProjectOption, ConnectResult, NeedsProjectPickResult } from '../types'
 
 const emit = defineEmits<{ connected: [result: ConnectResult] }>()
 
@@ -21,6 +21,15 @@ const autoConnecting = ref(true)
 const pendingProjects = ref<BcfProjectOption[] | null>(null)
 const selectedProjectId = ref<string | null>(null)
 
+// Two different hosts trigger the project picker two different ways (see bridge.ts's header
+// comment and OpenBcf.ArchiCad29.Helper's BcfSessionBinding.CompleteConnect for why):
+//   - 'push': Connect()'s own native call is still pending, and a projectPickRequested event
+//     pushed it - answering goes back through the same pending call via ResolveProjectPick
+//     (Rhino/Tekla/Revit, over WebView2).
+//   - 'inline': Connect() already returned (with needsProjectPick in its result) - answering is a
+//     brand new, independent CompleteConnect call (ArchiCAD).
+const pickMode = ref<'push' | 'inline'>('push')
+
 onMounted(async () => {
   try {
     const settings = await callBinding<{ serverUrl: string; username: string | null }>('bcfSessionBinding', 'GetSettings')
@@ -32,6 +41,7 @@ onMounted(async () => {
 
   onBindingEvent('bcfSessionBinding', 'projectPickRequested', (payload) => {
     const { projects, previousProjectId } = payload as { projects: BcfProjectOption[]; previousProjectId: string | null }
+    pickMode.value = 'push'
     pendingProjects.value = projects
     selectedProjectId.value = previousProjectId ?? projects[0]?.id ?? null
   })
@@ -56,7 +66,7 @@ async function connect() {
   errorMessage.value = null
 
   try {
-    const result = await callBinding<ConnectResult>(
+    const result = await callBinding<ConnectResult | NeedsProjectPickResult>(
       'bcfSessionBinding',
       'Connect',
       serverUrl.value,
@@ -64,6 +74,14 @@ async function connect() {
       password.value || null,
     )
     status.value = 'idle'
+
+    if ('needsProjectPick' in result) {
+      pickMode.value = 'inline'
+      pendingProjects.value = result.projects
+      selectedProjectId.value = result.previousProjectId ?? result.projects[0]?.id ?? null
+      return
+    }
+
     emit('connected', result)
   } catch (err) {
     status.value = 'error'
@@ -74,12 +92,31 @@ async function connect() {
 async function confirmProjectPick() {
   const projectId = selectedProjectId.value
   pendingProjects.value = null
-  await callBinding('bcfSessionBinding', 'ResolveProjectPick', projectId)
+  try {
+    if (pickMode.value === 'inline') {
+      const result = await callBinding<ConnectResult>('bcfSessionBinding', 'CompleteConnect', projectId)
+      emit('connected', result)
+    } else {
+      await callBinding('bcfSessionBinding', 'ResolveProjectPick', projectId)
+    }
+  } catch (err) {
+    status.value = 'error'
+    errorMessage.value = err instanceof Error ? err.message : String(err)
+  }
 }
 
 async function cancelProjectPick() {
   pendingProjects.value = null
-  await callBinding('bcfSessionBinding', 'ResolveProjectPick', null)
+  try {
+    if (pickMode.value === 'inline') {
+      await callBinding('bcfSessionBinding', 'CompleteConnect', null)
+    } else {
+      await callBinding('bcfSessionBinding', 'ResolveProjectPick', null)
+    }
+  } catch (err) {
+    status.value = 'error'
+    errorMessage.value = err instanceof Error ? err.message : String(err)
+  }
 }
 </script>
 

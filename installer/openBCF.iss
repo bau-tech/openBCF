@@ -15,6 +15,14 @@
 ; the matching version's SDK assemblies, to compile - see OpenBcf.Tekla2026.Client.csproj; the
 ; Rhino build needs a real Rhino 8 install, or -p:RhinoSystemPath pointed at its System folder)
 ; then compile with Inno Setup 6 (ISCC.exe openBCF.iss).
+;
+; The ArchiCAD 29 component is best-effort: it needs a real, one-off native build before this
+; script can package it - `dotnet publish` OpenBcf.ArchiCad29.Helper, then a real CMake build of
+; OpenBcf.ArchiCad29.NativeAddOn next to it (see that project's README.md and its CMakeLists.txt's
+; post-build copy step) - so its [Files] entry below uses "skipifsourcedoesntexist" and will
+; simply install nothing for that component until that's been done. GetArchiCadAddOnsDir's path
+; (Add-Ons\Local\ under the real ArchiCAD 29 install directory) has been live-confirmed as the
+; correct deploy target, unlike an earlier draft's guess at a per-user AppData folder.
 
 #define MyAppName "openBCF"
 #define MyAppVersion "0.3.0"
@@ -25,7 +33,7 @@ AppId={{67EFA528-C91C-4A69-AFEE-673EAACA549E}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppComments=Open BCF client for Revit, Tekla Structures, and Rhino
+AppComments=Open BCF client for Revit, Tekla Structures, Rhino, and ArchiCAD
 VersionInfoDescription=openBCF Setup
 DefaultDirName={autopf}\openBCF
 DefaultGroupName=openBCF
@@ -58,6 +66,7 @@ Name: "revit"; Description: "Revit 2025 add-in"; Types: full custom
 Name: "tekla2025"; Description: "Tekla Structures 2025.0 plugin"; Types: full custom
 Name: "tekla2026"; Description: "Tekla Structures 2026.0 plugin"; Types: full custom
 Name: "rhino8"; Description: "Rhino 8 plug-in"; Types: full custom
+Name: "archicad29"; Description: "ArchiCAD 29 add-on (native build required - see installer/openBCF.iss)"; Types: full custom
 
 [Files]
 ; --- Revit 2025 add-in ---
@@ -101,6 +110,18 @@ Source: "..\src\OpenBcf.Tekla2026.Client\TeklaEnvironment\BCF-icon.png"; \
 Source: "..\src\OpenBcf.Rhino8.Client\bin\Release\net48\*"; \
   DestDir: "{code:GetRhinoPluginsDir}\OpenBcf.Rhino8.Client (FC15C4D1-F0BF-49E5-AA7D-B6692D79B056)"; \
   Flags: recursesubdirs createallsubdirs ignoreversion; Components: rhino8
+
+; --- ArchiCAD 29 add-on ---
+; CMakeLists.txt's post-build step already copies OpenBcf.ArchiCad29.Helper's publish output next
+; to the built openBCF.apx, so the whole build\Release\ folder (whichever CMake config was used)
+; can be copied as one flat unit straight into Add-Ons\Local\ - same shape ArchiCAD's own built-in
+; Local add-ons use (Align View, Grid Tool, etc.), live-confirmed against a real ArchiCAD 29
+; install. Not built as of this writing (see the header comment above) - skipifsourcedoesntexist
+; means this component quietly installs nothing rather than failing the whole installer compile
+; until that changes.
+Source: "..\src\OpenBcf.ArchiCad29.NativeAddOn\build\Release\*"; \
+  DestDir: "{code:GetArchiCadAddOnsDir}"; \
+  Flags: recursesubdirs createallsubdirs ignoreversion skipifsourcedoesntexist; Components: archicad29
 
 [Icons]
 Name: "{group}\Uninstall openBCF"; Filename: "{uninstallexe}"
@@ -146,6 +167,21 @@ begin
   Result := DirExists(ExpandConstant('{pf64}\Rhino 8'));
 end;
 
+function GetArchiCadAddOnsDir(Param: String): String;
+begin
+  // Add-Ons\Local\ under the real ArchiCAD 29 install directory - live-confirmed as the correct,
+  // machine-wide deploy target (same folder ArchiCAD's own built-in Local add-ons use), not the
+  // per-user AppData "Add-On Files" folder an earlier draft guessed at (that's for user-managed
+  // add-on *references*, configured via Options > Work Environment > Special Folders, not where
+  // an add-on's own files actually live).
+  Result := ExpandConstant('{pf64}\GRAPHISOFT\ARCHICAD 29\Add-Ons\Local');
+end;
+
+function ArchiCadDetected(): Boolean;
+begin
+  Result := DirExists(ExpandConstant('{pf64}\GRAPHISOFT\ARCHICAD 29'));
+end;
+
 procedure InitializeWizard();
 var
   Selected: String;
@@ -171,6 +207,12 @@ begin
       Selected := Selected + ',';
     Selected := Selected + 'rhino8';
   end;
+  if ArchiCadDetected() then
+  begin
+    if Selected <> '' then
+      Selected := Selected + ',';
+    Selected := Selected + 'archicad29';
+  end;
   // Leaves everything unchecked if nothing is detected, rather than blindly installing into
   // folders for products that aren't there - NextButtonClick below still lets the user force it
   // manually.
@@ -182,7 +224,7 @@ begin
   Result := True;
   if (CurPageID = wpSelectComponents) and (not WizardIsComponentSelected('revit'))
     and (not WizardIsComponentSelected('tekla2025')) and (not WizardIsComponentSelected('tekla2026'))
-    and (not WizardIsComponentSelected('rhino8')) then
+    and (not WizardIsComponentSelected('rhino8')) and (not WizardIsComponentSelected('archicad29')) then
   begin
     MsgBox('Select at least one component to install.', mbError, MB_OK);
     Result := False;
@@ -194,8 +236,8 @@ begin
   if CurPageID = wpSelectComponents then
   begin
     if (not RevitDetected()) and (not TeklaVersionDetected('2025.0')) and (not TeklaVersionDetected('2026.0'))
-      and (not RhinoDetected()) then
-      MsgBox('Neither Revit 2025, Tekla Structures 2025.0/2026.0, nor Rhino 8 was detected on this machine.' + #13#10 +
+      and (not RhinoDetected()) and (not ArchiCadDetected()) then
+      MsgBox('Neither Revit 2025, Tekla Structures 2025.0/2026.0, Rhino 8, nor ArchiCAD 29 was detected on this machine.' + #13#10 +
         'You can still select a component to install it anyway (e.g. to prepare ahead of installing the host application).',
         mbInformation, MB_OK);
   end;
@@ -203,7 +245,7 @@ end;
 
 function InitializeUninstall(): Boolean;
 begin
-  MsgBox('If Revit, Tekla Structures, or Rhino is currently running, close it first so the add-in files can be removed.',
+  MsgBox('If Revit, Tekla Structures, Rhino, or ArchiCAD is currently running, close it first so the add-in files can be removed.',
     mbInformation, MB_OK);
   Result := True;
 end;

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Out-of-process helper for the openBCF ArchiCAD 29 Add-On (../OpenBcf.ArchiCad29.NativeAddOn) -
+         see that project's Src/HelperProcess.h for why this is a separate .exe rather than an
+         in-process hostfxr-hosted class library: ArchiCAD cycles Initialize()/FreeData() on the
+         native Add-On (most likely a full .apx DLL unload/reload) independently of anything the
+         Add-On does, which a hosted CoreCLR runtime cannot survive - so .NET runs here instead, in
+         a process whose lifetime is independent of that cycling.
+
+         Headless: this process owns no window. ArchiCAD's own native DG::Browser control
+         (BcfPalette.cpp) hosts the actual UI - loading this process's Http/StaticFileServer.cs over
+         HTTP and calling back into Ipc/BridgeServer.cs for every binding method. An earlier version
+         of this project owned a WPF/WebView2 window reparented into ArchiCAD's palette; that
+         deadlocked ArchiCAD live (see HelperProcess.h's header comment) by requiring a
+         foreign-process window to be attached to ArchiCAD's own thread's input queue. UseWPF stays
+         on only for Microsoft.Win32.SaveFileDialog/OpenFileDialog (BcfArchiveBinding), which need
+         PresentationFramework.dll but not an Application/Dispatcher/Window. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenBcf.Core\OpenBcf.Core.csproj" />
+    <ProjectReference Include="..\OpenBcf.Dui\OpenBcf.Dui.csproj" />
+  </ItemGroup>
+
+  <!-- Builds the DUI3 frontend (frontend/openbcf-dui) and copies its compiled output into
+       wwwroot/ alongside this assembly - StaticFileServer.cs serves it over HTTP from there. -->
+  <PropertyGroup>
+    <FrontendDir>$(MSBuildThisFileDirectory)..\..\frontend\openbcf-dui</FrontendDir>
+  </PropertyGroup>
+
+  <Target Name="BuildDuiFrontend" BeforeTargets="Build" Inputs="$(FrontendDir)\src\**\*" Outputs="$(FrontendDir)\dist\index.html">
+    <Exec Command="npm install" WorkingDirectory="$(FrontendDir)" Condition="!Exists('$(FrontendDir)\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(FrontendDir)" />
+  </Target>
+
+  <Target Name="CopyDuiFrontend" AfterTargets="Build" DependsOnTargets="BuildDuiFrontend">
+    <ItemGroup>
+      <DuiFrontendDist Include="$(FrontendDir)\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DuiFrontendDist)" DestinationFolder="$(OutDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyDuiFrontendToPublishDir" AfterTargets="Publish">
+    <ItemGroup>
+      <DuiFrontendPublish Include="$(OutDir)wwwroot\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DuiFrontendPublish)" DestinationFolder="$(PublishDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

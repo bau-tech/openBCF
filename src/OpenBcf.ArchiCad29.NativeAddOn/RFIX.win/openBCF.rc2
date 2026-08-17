@@ -1,0 +1,11 @@
+/* *****************************************************************************
+// Resource description for the openBCF Add-On (Windows) - matches the shape
+// Examples/Selection_Manager/RFIX.win/Selection_Manager.rc2 uses in the real ArchiCAD 29 API
+// DevKit: CompileResources.py generates <name>.grc.rc2 from ../RFIX/openBCFFix.grc, and this
+// file #includes it plus declares the Windows ICON resource CompileResources.py doesn't handle
+// itself.
+// ****************************************************************************/
+
+#include "openBCFFix.grc.rc2"
+
+1		ICON    LOADONCALL MOVEABLE IMPURE  "../../../installer/assets/openBCF.ico"

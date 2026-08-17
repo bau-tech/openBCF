@@ -9,6 +9,15 @@ export interface ConnectResult {
   projectName: string | null
 }
 
+// Returned by bcfSessionBinding.Connect on ArchiCAD instead of a push event, when the server has
+// more than one project - see OpenBcf.ArchiCad29.Helper's BcfSessionBinding.CompleteConnect for why
+// that host can't use the same push-event flow the other clients' Connect() blocks on.
+export interface NeedsProjectPickResult {
+  needsProjectPick: true
+  projects: BcfProjectOption[]
+  previousProjectId: string | null
+}
+
 export interface TopicListItem {
   guid: string
   title: string
