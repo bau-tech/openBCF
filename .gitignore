@@ -10,3 +10,4 @@ installer/Output/
 *.log
 __pycache__/
 *.pyc
+.tekla-sdk/

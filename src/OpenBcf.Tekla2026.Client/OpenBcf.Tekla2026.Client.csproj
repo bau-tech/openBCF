@@ -15,9 +15,19 @@
   <PropertyGroup>
     <!-- Tekla has no public NuGet feed for its Open API; every host project references the
          assemblies straight out of the installed bin folder. Override TeklaStructuresBinPath
-         (e.g. -p:TeklaStructuresBinPath=... or a local Directory.Build.props.user) if Tekla is
-         installed somewhere other than the default below. -->
+         (e.g. -p:TeklaStructuresBinPath=...) if Tekla is installed somewhere other than the
+         default below - e.g. a local copy of the reference DLLs when Tekla 2026 itself isn't
+         installed on this machine (see [[reference_remote_test_machine]] in project memory: DLLs
+         were pulled from the real 2026 install at REDACTED-internal-ip into .tekla-sdk\2026.0\bin\,
+         gitignored, not redistributed). -->
     <TeklaStructuresBinPath Condition="'$(TeklaStructuresBinPath)' == ''">$(ProgramFiles)\Tekla Structures\2026.0\bin</TeklaStructuresBinPath>
+    <!-- Unlike 2025, Tekla Structures 2026 splits its Open API assemblies across two folders:
+         Tekla.Structures.Model.dll/Tekla.Structures.Dialog.dll stayed directly under bin\, but
+         Tekla.Structures.dll and Tekla.Structures.Plugins.dll moved into bin\Net48Runtime\
+         (confirmed against a real 2026.0 install - Tekla itself now runs on a newer .NET and
+         Net48Runtime\ is the compat folder it ships for net48 plugins like this one). Referencing
+         all four straight out of bin\ like the 2025 project does fails to resolve two of them. -->
+    <TeklaStructuresNet48RuntimePath Condition="'$(TeklaStructuresNet48RuntimePath)' == ''">$(TeklaStructuresBinPath)\Net48Runtime</TeklaStructuresNet48RuntimePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +41,7 @@
          probing path), so they must not be copied into our output - mirrors Speckle.Revit.API's
          ExcludeAssets="runtime" in OpenBcf.Revit2025.Client.csproj. -->
     <Reference Include="Tekla.Structures">
-      <HintPath>$(TeklaStructuresBinPath)\Tekla.Structures.dll</HintPath>
+      <HintPath>$(TeklaStructuresNet48RuntimePath)\Tekla.Structures.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Tekla.Structures.Model">
@@ -46,7 +56,7 @@
       <Private>false</Private>
     </Reference>
     <Reference Include="Tekla.Structures.Plugins">
-      <HintPath>$(TeklaStructuresBinPath)\Tekla.Structures.Plugins.dll</HintPath>
+      <HintPath>$(TeklaStructuresNet48RuntimePath)\Tekla.Structures.Plugins.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
