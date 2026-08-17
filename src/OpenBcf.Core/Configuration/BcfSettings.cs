@@ -7,19 +7,19 @@ namespace OpenBcf.Core.Configuration;
 /// <summary>
 /// User-configurable openBCF settings, shared across host plugins (Revit, Tekla, ...) via a
 /// single JSON file under the current user's AppData folder. Never hardcode a server URL in
-/// plugin code — always go through <see cref="Load"/>.
+/// plugin code — always go through <see cref="Load"/>. <see cref="ServerUrl"/> is null until the
+/// user has actually connected once (see each host's BcfSessionBinding.Connect); there is no
+/// built-in default server.
 /// </summary>
-public sealed record BcfSettings(Uri ServerUrl, string? Username = null, string? Password = null)
+public sealed record BcfSettings(Uri? ServerUrl, string? Username = null, string? Password = null)
 {
-    public static readonly Uri DefaultServerUrl = BcfServerConnection.DefaultServerUrl;
-
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openBCF", "settings.json");
 
     public static BcfSettings Load()
     {
         if (!File.Exists(SettingsPath))
-            return new BcfSettings(DefaultServerUrl);
+            return new BcfSettings(ServerUrl: null);
 
         try
         {
@@ -27,11 +27,11 @@ public sealed record BcfSettings(Uri ServerUrl, string? Username = null, string?
             var dto = JsonSerializer.Deserialize<SettingsDto>(json);
             return dto?.ServerUrl is { Length: > 0 } url
                 ? new BcfSettings(new Uri(url), dto.Username, ProtectedSecret.Unprotect(dto.ProtectedPassword))
-                : new BcfSettings(DefaultServerUrl);
+                : new BcfSettings(ServerUrl: null);
         }
         catch (Exception ex) when (ex is IOException or JsonException or UriFormatException)
         {
-            return new BcfSettings(DefaultServerUrl);
+            return new BcfSettings(ServerUrl: null);
         }
     }
 
@@ -43,7 +43,7 @@ public sealed record BcfSettings(Uri ServerUrl, string? Username = null, string?
 
         var json = JsonSerializer.Serialize(new SettingsDto
         {
-            ServerUrl = ServerUrl.ToString(),
+            ServerUrl = ServerUrl?.ToString(),
             Username = Username,
             ProtectedPassword = ProtectedSecret.Protect(Password),
         });

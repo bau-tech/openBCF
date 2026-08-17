@@ -46,7 +46,7 @@ class OpenBcfPreferences(bpy.types.AddonPreferences):
     server_url: bpy.props.StringProperty(
         name="Server URL",
         description="Base URL of a buildingSMART BCF REST API server",
-        default="https://REDACTED-server.invalid",
+        default="",
     )
     username: bpy.props.StringProperty(name="Username", default="")
 

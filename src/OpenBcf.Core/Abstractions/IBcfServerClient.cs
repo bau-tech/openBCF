@@ -6,7 +6,7 @@ namespace OpenBcf.Core.Abstractions;
 
 /// <summary>
 /// Talks to a buildingSMART BCF REST API server. Implementations must work against any
-/// compliant server, not just a specific deployment such as https://REDACTED-server.invalid.
+/// compliant server, not just one specific deployment.
 /// </summary>
 public interface IBcfServerClient
 {

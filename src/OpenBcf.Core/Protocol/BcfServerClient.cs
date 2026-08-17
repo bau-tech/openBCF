@@ -30,9 +30,9 @@ public sealed class BcfHttpRequestException : HttpRequestException
 }
 
 /// <summary>
-/// HTTP client for the buildingSMART BCF REST API. Works against any compliant server;
-/// callers choose the server via <see cref="BcfServerConnection.BaseUrl"/>, defaulting to
-/// <see cref="BcfServerConnection.DefaultServerUrl"/> (https://REDACTED-server.invalid) when none is supplied.
+/// HTTP client for the buildingSMART BCF REST API. Works against any compliant server; callers
+/// always choose the server explicitly via <see cref="BcfServerConnection.BaseUrl"/> - there is no
+/// built-in default.
 /// </summary>
 public sealed class BcfServerClient : IBcfServerClient, IDisposable
 {
@@ -42,9 +42,9 @@ public sealed class BcfServerClient : IBcfServerClient, IDisposable
 
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
 
-    public BcfServerClient(BcfServerConnection? connection = null)
+    public BcfServerClient(BcfServerConnection connection)
         : this(
-            connection ?? new BcfServerConnection(BcfServerConnection.DefaultServerUrl),
+            connection,
             // UseProxy=false avoids Windows' automatic proxy/WPAD auto-detection, which can hang
             // independently of HttpClient.Timeout and has been observed to freeze the host process.
             new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = DefaultTimeout },

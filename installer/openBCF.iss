@@ -25,7 +25,7 @@
 ; correct deploy target, unlike an earlier draft's guess at a per-user AppData folder.
 
 #define MyAppName "openBCF"
-#define MyAppVersion "0.4.1"
+#define MyAppVersion "0.4.2"
 #define MyAppPublisher "openBCF"
 
 [Setup]

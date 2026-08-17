@@ -6,8 +6,6 @@ public sealed record BcfServerConnection(
     string? BasicUsername = null,
     string? BasicPassword = null)
 {
-    public static readonly Uri DefaultServerUrl = new("https://REDACTED-server.invalid");
-
     public BcfServerConnection WithAccessToken(string accessToken) =>
         this with { AccessToken = accessToken, BasicUsername = null, BasicPassword = null };
 

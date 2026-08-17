@@ -35,7 +35,7 @@ public sealed class BcfSessionBinding : IBinding
     public Task<object> GetSettings()
     {
         var settings = BcfSettings.Load();
-        return Task.FromResult<object>(new { serverUrl = settings.ServerUrl.ToString(), username = settings.Username });
+        return Task.FromResult<object>(new { serverUrl = settings.ServerUrl?.ToString() ?? "", username = settings.Username });
     }
 
     /// <summary>
@@ -51,7 +51,7 @@ public sealed class BcfSessionBinding : IBinding
     public async Task<object?> TryAutoConnect()
     {
         var settings = BcfSettings.Load();
-        if (settings.Username is not { Length: > 0 } || settings.Password is not { Length: > 0 })
+        if (settings.ServerUrl is null || settings.Username is not { Length: > 0 } || settings.Password is not { Length: > 0 })
             return null;
 
         try
