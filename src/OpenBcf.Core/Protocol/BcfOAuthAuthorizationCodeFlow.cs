@@ -28,27 +28,30 @@ public static class BcfOAuthAuthorizationCodeFlow
     private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(3);
 
-    public static Task<string> AuthenticateAsync(BcfServerAuthOptions options, Uri serverBaseUrl, CancellationToken cancellationToken = default) =>
+    public static Task<string> AuthenticateAsync(BcfServerAuthOptions options, Uri serverBaseUrl, CancellationToken cancellationToken = default, bool forceRefresh = false) =>
         AuthenticateCoreAsync(
             options,
             serverBaseUrl,
             (httpClient, client, redirectUri, ct) => RunInteractiveSignInAsync(httpClient, options, client, redirectUri, ct),
+            forceRefresh,
             cancellationToken);
 
     public static Task<string> AuthenticateWithCredentialsAsync(
-        BcfServerAuthOptions options, Uri serverBaseUrl, string username, string password, CancellationToken cancellationToken = default) =>
+        BcfServerAuthOptions options, Uri serverBaseUrl, string username, string password, CancellationToken cancellationToken = default, bool forceRefresh = false) =>
         AuthenticateCoreAsync(
             options,
             serverBaseUrl,
             async (httpClient, client, redirectUri, ct) =>
                 await RunCredentialsSignInAsync(httpClient, options, client, redirectUri, username, password, ct).ConfigureAwait(false)
                 ?? await RunInteractiveSignInAsync(httpClient, options, client, redirectUri, ct).ConfigureAwait(false),
+            forceRefresh,
             cancellationToken);
 
     private static async Task<string> AuthenticateCoreAsync(
         BcfServerAuthOptions options,
         Uri serverBaseUrl,
         Func<HttpClient, RegisteredClientInfo, string, CancellationToken, Task<CachedOAuthSession>> signInAsync,
+        bool forceRefresh,
         CancellationToken cancellationToken)
     {
         if (!options.SupportsAuthorizationCodeGrant)
@@ -59,7 +62,10 @@ public static class BcfOAuthAuthorizationCodeFlow
         // or any other partial/corrupted write) must never be trusted just because its expiry
         // looks fine - that sends "Authorization: Bearer " (empty) on every request, which the
         // server rejects with 401 forever since nothing here would ever notice and re-authenticate.
-        if (cached is { AccessToken: { Length: > 0 } } && cached.ExpiresAtUtc > DateTimeOffset.UtcNow.AddSeconds(30))
+        // `forceRefresh` (set by BcfConnector after the server itself already rejected this exact
+        // cached token with a 401) skips this shortcut even when the local expiry still looks
+        // fine - the server, not our clock, is the source of truth for whether a token is live.
+        if (!forceRefresh && cached is { AccessToken: { Length: > 0 } } && cached.ExpiresAtUtc > DateTimeOffset.UtcNow.AddSeconds(30))
             return cached.AccessToken;
 
         using var httpClient = new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = HttpTimeout };

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -7,6 +8,26 @@ using OpenBcf.Core.Model.Visualization;
 using OpenBcf.Core.Protocol.Dto;
 
 namespace OpenBcf.Core.Protocol;
+
+/// <summary>
+/// Thrown by <see cref="BcfServerClient"/> instead of a plain <see cref="HttpRequestException"/>
+/// so callers (see <see cref="BcfConnector"/>) can distinguish a 401 - which, for a token that the
+/// local <see cref="BcfOAuthSessionCache"/> still believes is unexpired, means the server itself
+/// invalidated/rotated it (restart, revoked session, clock drift) - from every other failure.
+/// Derives from <see cref="HttpRequestException"/> so existing catch sites keep working unchanged.
+/// </summary>
+public sealed class BcfHttpRequestException : HttpRequestException
+{
+    // Not named "StatusCode" - HttpRequestException.StatusCode is nullable and .NET 5+ only, so
+    // reusing that name would need a `new` that's a warning under net48 (no such base member
+    // there) and a no-op under net8.0's target of this net48/net8.0-multi-targeted project.
+    public HttpStatusCode ResponseStatusCode { get; }
+
+    public BcfHttpRequestException(HttpStatusCode statusCode, string message) : base(message)
+    {
+        ResponseStatusCode = statusCode;
+    }
+}
 
 /// <summary>
 /// HTTP client for the buildingSMART BCF REST API. Works against any compliant server;
@@ -392,7 +413,8 @@ public sealed class BcfServerClient : IBcfServerClient, IDisposable
         // OpenBcf.Core targets net48 alongside net8.0.
         var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         var detail = string.IsNullOrWhiteSpace(body) ? string.Empty : $": {body}";
-        throw new HttpRequestException(
+        throw new BcfHttpRequestException(
+            response.StatusCode,
             $"{(int)response.StatusCode} {response.ReasonPhrase} from {response.RequestMessage?.Method} {response.RequestMessage?.RequestUri}{detail}");
     }
 

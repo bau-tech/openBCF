@@ -18,7 +18,8 @@ public static class BcfAuthenticationResolver
         string versionId,
         string? username,
         string? password,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool forceRefresh = false)
     {
         var options = await discoveryClient.GetAuthOptionsAsync(versionId, cancellationToken).ConfigureAwait(false);
 
@@ -28,8 +29,8 @@ public static class BcfAuthenticationResolver
         if (options.SupportsAuthorizationCodeGrant)
         {
             var token = string.IsNullOrWhiteSpace(username)
-                ? await BcfOAuthAuthorizationCodeFlow.AuthenticateAsync(options, connection.BaseUrl, cancellationToken).ConfigureAwait(false)
-                : await BcfOAuthAuthorizationCodeFlow.AuthenticateWithCredentialsAsync(options, connection.BaseUrl, username!, password ?? string.Empty, cancellationToken).ConfigureAwait(false);
+                ? await BcfOAuthAuthorizationCodeFlow.AuthenticateAsync(options, connection.BaseUrl, cancellationToken, forceRefresh).ConfigureAwait(false)
+                : await BcfOAuthAuthorizationCodeFlow.AuthenticateWithCredentialsAsync(options, connection.BaseUrl, username!, password ?? string.Empty, cancellationToken, forceRefresh).ConfigureAwait(false);
             return connection.WithAccessToken(token);
         }
 

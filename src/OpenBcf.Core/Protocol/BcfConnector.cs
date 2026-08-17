@@ -1,3 +1,4 @@
+using System.Net;
 using OpenBcf.Core.Model;
 
 namespace OpenBcf.Core.Protocol;
@@ -35,11 +36,29 @@ public static class BcfConnector
         // based on what the server actually advertises - never assumes a "password" grant.
         connection = await BcfAuthenticationResolver.AuthenticateAsync(discoveryClient, connection, versionId, username, password, cancellationToken).ConfigureAwait(false);
 
-        using var client = new BcfServerClient(connection);
-        var projects = await client.GetProjectsAsync(versionId, cancellationToken).ConfigureAwait(false);
-        var project = await BcfProjectResolver.ResolveAsync(client.BaseUrl, modelKey, projects, pickProjectAsync).ConfigureAwait(false);
+        IReadOnlyList<BcfProject> projects;
+        using (var client = new BcfServerClient(connection))
+        {
+            try
+            {
+                projects = await client.GetProjectsAsync(versionId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (BcfHttpRequestException ex) when (ex.ResponseStatusCode == HttpStatusCode.Unauthorized)
+            {
+                // The server just rejected a token BcfAuthenticationResolver believed was still
+                // good - e.g. a cached OAuth2 access token whose local expiry hasn't passed yet,
+                // but the server itself revoked/rotated it (restart, session revocation, clock
+                // drift). Retry once with forceRefresh so the OAuth flow skips that stale
+                // local-expiry shortcut and goes straight to a refresh-token exchange (or a fresh
+                // sign-in if that also fails) instead of surfacing a 401 the user can't act on.
+                connection = await BcfAuthenticationResolver.AuthenticateAsync(discoveryClient, connection, versionId, username, password, cancellationToken, forceRefresh: true).ConfigureAwait(false);
+                using var retryClient = new BcfServerClient(connection);
+                projects = await retryClient.GetProjectsAsync(versionId, cancellationToken).ConfigureAwait(false);
+            }
 
-        return new BcfActiveSession(connection, versionId, project, modelKey);
+            var project = await BcfProjectResolver.ResolveAsync(connection.BaseUrl, modelKey, projects, pickProjectAsync).ConfigureAwait(false);
+            return new BcfActiveSession(connection, versionId, project, modelKey);
+        }
     }
 
     private static Version ParseVersion(string versionId) =>
