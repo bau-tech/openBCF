@@ -2,7 +2,7 @@
 HTTP client for the buildingSMART BCF REST API - the Python-side equivalent of
 OpenBcf.Core.Protocol.BcfServerClient, kept endpoint-for-endpoint and field-for-field consistent
 with it (same URL paths, same JSON keys) so both clients interoperate with the same servers,
-notably the project's own test server REDACTED-server.invalid.
+notably the project's own reference test server.
 
 Deliberately uses only the standard library (urllib.request/json/base64) rather than "requests" -
 Blender extensions can bundle third-party wheels, but there is no reason to here, and it keeps
@@ -149,11 +149,11 @@ def build_viewpoint_write_body(
 ) -> dict:
     """
     Builds a viewpoint creation body in BOTH the spec-compliant nested shape (perspective_camera/
-    orthogonal_camera/components) AND REDACTED-server.invalid's actual flat shape (camera_view_point/
+    orthogonal_camera/components) AND the project's reference test server's actual flat shape (camera_view_point/
     camera_direction/... and a top-level "selection" IFC GUID array) - mirrors
     BcfRestMapper.ToWriteDto in OpenBcf.Core exactly, including the "snapshot_base64" field that
     server expects instead of the spec's nested "snapshot" object. A spec-compliant server ignores
-    the extra flat/snapshot_base64 fields; REDACTED-server.invalid ignores the nested ones - sending both
+    the extra flat/snapshot_base64 fields; the project's reference test server ignores the nested ones - sending both
     is what makes a viewpoint's camera/selection/snapshot actually round-trip on this server (see
     ViewpointDto.cs's comments for how this was discovered).
     """
@@ -201,7 +201,7 @@ def build_viewpoint_write_body(
 
 def parse_viewpoint_camera(viewpoint_dto: dict) -> Optional[dict]:
     """Inverse of build_viewpoint_write_body's camera fields - reads whichever shape a GET
-    response actually used (nested perspective_camera/orthogonal_camera, or REDACTED-server.invalid's flat
+    response actually used (nested perspective_camera/orthogonal_camera, or the reference test server's flat
     is_orthogonal/camera_* fields), mirroring BcfRestMapper.ToDomainCamera's fallback order."""
     perspective = viewpoint_dto.get("perspective_camera")
     if perspective:
@@ -242,7 +242,7 @@ def parse_viewpoint_camera(viewpoint_dto: dict) -> Optional[dict]:
 
 def parse_viewpoint_selection(viewpoint_dto: dict) -> list[str]:
     """Reads selected IFC GUIDs from either shape - nested components.selection[].ifc_guid, or
-    REDACTED-server.invalid's flat "selection" array (which the server can echo back either as plain
+    the reference test server's flat "selection" array (which the server can echo back either as plain
     strings or, with a Speckle bridge, as {"ifc_guid": ..., "speckle_id": ...} objects - see
     FlexibleGuidListConverter in ViewpointDto.cs for why both are handled here too)."""
     components = viewpoint_dto.get("components")

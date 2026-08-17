@@ -192,7 +192,7 @@ public sealed class BcfIssueBinding : IBinding
         dueDate = topic.DueDate,
     };
 
-    // REDACTED-server.invalid rejects topic creation/comments with a 422 if creation_author/author is
+    // The project's reference test server rejects topic creation/comments with a 422 if creation_author/author is
     // null - always send something rather than relying on the server to fill it in from auth.
     private static string ResolveAuthor() =>
         BcfSettings.Load().Username is { Length: > 0 } username ? username : Environment.UserName;

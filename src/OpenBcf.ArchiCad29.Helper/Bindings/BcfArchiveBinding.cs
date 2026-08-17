@@ -65,7 +65,7 @@ public sealed class BcfArchiveBinding : IBinding
     /// <see cref="FileDialog.ShowDialog()"/> wraps the Vista+ native <c>IFileDialog</c> COM API,
     /// which requires a genuine STA thread - unlike WinForms' file dialogs, it doesn't throw a
     /// friendly .NET exception when that's violated, it just hangs indefinitely with no visible
-    /// window and no response (confirmed live, REDACTED-internal-ip, 2026-08-17: the bridge pipe request
+    /// window and no response (confirmed live, the remote test machine, 2026-08-17: the bridge pipe request
     /// for ExportToFile never got a response at all - not even an error - and Alt+Tab showed no
     /// dialog anywhere). This process's own entry point is `[STAThread]` (see Program.cs), but that
     /// only applies to the thread that runs Main - every request here actually executes on

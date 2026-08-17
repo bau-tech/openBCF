@@ -200,7 +200,7 @@ internal static class BcfRestMapper
                 ToDomain(orthogonal.CameraUpVector),
                 ViewToWorldScale: orthogonal.ViewToWorldScale ?? 1);
 
-        // Fallback to REDACTED-server.invalid's flat, non-spec camera fields - see the comments on
+        // Fallback to the project's reference test server's flat, non-spec camera fields - see the comments on
         // ViewpointDto/ViewpointWriteDto for why these exist alongside the nested shape above.
         if (dto.CameraViewPoint is { } viewPoint)
         {

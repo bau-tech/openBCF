@@ -18,7 +18,7 @@ namespace
 	// mirrors OpenBcf.Dui.Bridge.BrowserBridge's own reflection-based method list exactly, just
 	// enumerated explicitly here since JS::Object needs each method registered as its own
 	// JS::Function up front (see this file's header comment on why: a real, confirmed-live ACAPI
-	// limitation - REDACTED-internal-ip, 2026-08-12 - where a second call into the SAME registered
+	// limitation - the remote test machine, 2026-08-12 - where a second call into the SAME registered
 	// JS::Function cannot get through while an earlier call to it is still pending, e.g. Connect
 	// blocking on the user's project pick while ResolveProjectPick tries to answer it through what
 	// used to be the same shared "RunMethod" function. Giving every method its own JS::Function
@@ -48,7 +48,7 @@ namespace
 	} };
 
 	// DIAGNOSTIC ONLY (kept from the in-process debugging session - still useful for verifying
-	// real Initialize()/FreeData() cycling and the new DG::Browser handoff on REDACTED-internal-ip).
+	// real Initialize()/FreeData() cycling and the new DG::Browser handoff on the remote test machine).
 	// ACAPI_WriteReport goes to ArchiCAD's in-app Report window, not a file, which turned out to be
 	// much less convenient to check than expected - this appends plain text next to the Add-On's
 	// own .apx instead, so it can be inspected directly over SSH.
@@ -125,7 +125,7 @@ void BcfPalette::CreateInstance(HelperProcess& helperProcess)
 	// Real, documented ACAPI call (Support/Inc/ACAPinc.h, matches the official Browser_Control
 	// DevKit example's CreateInstance exactly) - and the actual, confirmed root cause of this
 	// entire out-of-process rewrite's remaining symptom (palette flashing then disappearing, see
-	// diag.log on REDACTED-internal-ip, 2026-08-12): ACAPinc.h's own doc comment for
+	// diag.log on the remote test machine, 2026-08-12): ACAPinc.h's own doc comment for
 	// ACAPI_KeepInMemory states plainly that "when in memory, the Initialize and the FreeData
 	// functions of your add-on are not called" - i.e. without this call, ArchiCAD unloads/reloads
 	// this Add-On (calling FreeData, which destroys this very instance via DestroyInstance) shortly

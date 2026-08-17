@@ -13,9 +13,9 @@ namespace OpenBcf.Core.Protocol;
 /// Implements OAuth2 Authorization Code grant (RFC 6749) with dynamic client registration
 /// (RFC 7591). The BCF API spec has no "password" grant, so signing in still goes through this
 /// flow even when the plugin UI collected a username/password - <see cref="AuthenticateWithCredentialsAsync"/>
-/// submits them directly to the server's own authorization endpoint (confirmed, for
-/// REDACTED-server.invalid's bcf-bridge, to be a plain email/password form with no other session/CSRF
-/// requirement) instead of opening a browser, so sign-in stays silent from the user's
+/// submits them directly to the server's own authorization endpoint (confirmed, for the
+/// project's reference test server's bcf-bridge, to be a plain email/password form with no other
+/// session/CSRF requirement) instead of opening a browser, so sign-in stays silent from the user's
 /// perspective. <see cref="AuthenticateAsync"/> (no credentials) falls back to opening the
 /// user's default browser and capturing the redirect on a local loopback listener, the standard
 /// pattern for native/desktop OAuth2 clients - used both when the plugin UI has no

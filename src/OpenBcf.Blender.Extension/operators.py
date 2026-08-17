@@ -71,8 +71,8 @@ class OPENBCF_OT_connect(bpy.types.Operator):
             auth_options = client.get_auth_options(version_id)
             if auth_options.get("http_basic_supported"):
                 # Not implemented: bcf_client.py's _request only ever sends a Bearer token, no
-                # Basic auth header - every server actually tested against (REDACTED-server.invalid)
-                # requires OAuth2 anyway (http_basic_supported: false), so this was left out
+                # Basic auth header - every server actually tested against (the project's
+                # reference test server) requires OAuth2 anyway (http_basic_supported: false), so this was left out
                 # rather than shipped untested.
                 raise bcf_client.BcfApiError(
                     "This server expects HTTP Basic auth, which this Blender add-on does not implement yet."

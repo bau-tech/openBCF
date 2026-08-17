@@ -118,7 +118,7 @@ way the other clients are — it's a **complete, independent reimplementation** 
   RFC 7591 dynamic client registration) sign-in flow, using only the standard library
   (`urllib.request`/`json`), kept endpoint-for-endpoint and field-for-field consistent with
   `OpenBcf.Core`'s C# client — including the same dual-shape (spec-compliant nested +
-  REDACTED-server.invalid's actual flat) accommodation for viewpoint camera/selection/snapshot data (see
+  the project's reference test server's actual flat) accommodation for viewpoint camera/selection/snapshot data (see
   `ViewpointDto.cs`'s comments for why that's necessary at all).
 - `camera.py` — captures/applies a BCF camera against Blender's active 3D viewport
   (`bpy.types.RegionView3D.view_matrix`), `selection.py` — selected-object ⇄ IFC GlobalId via
@@ -140,7 +140,7 @@ to end, against a local Blender 5.2.0 LTS + Bonsai 0.8.6 install: the extension 
 `blender --command extension build`, installed with `--command extension install-file`, and loaded
 without error (`register()` succeeding is itself a real test - a bad property/panel/operator
 declaration throws immediately). The full `openbcf.connect` operator was exercised with real HTTP
-calls against the project's own test server (REDACTED-server.invalid) - version discovery, auth discovery,
+calls against the project's own reference test server - version discovery, auth discovery,
 dynamic client registration, and a wrong-credentials sign-in attempt all worked exactly as
 designed.
 
@@ -155,8 +155,8 @@ forward * view_distance` confirmed empirically, not guessed) brought a live capt
 recapture round trip down to ~1e-7 error. The viewport screenshot came back as a real ~1.2 MB file
 starting with the exact PNG magic bytes.
 
-The full server round trip has since been run for real too, with a real account on
-REDACTED-server.invalid: sign-in, listing the account's actual projects, creating a topic, adding a
+The full server round trip has since been run for real too, with a real account on the project's
+reference test server: sign-in, listing the account's actual projects, creating a topic, adding a
 comment, creating a viewpoint (synthetic camera/selection/snapshot), reading it all back
 (camera/selection/snapshot bytes all matched exactly), confirming the topic appears in the topic
 list, and deleting the test topic again afterward to leave the account clean. Every step passed on

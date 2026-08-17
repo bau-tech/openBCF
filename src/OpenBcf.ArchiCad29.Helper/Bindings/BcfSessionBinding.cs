@@ -127,7 +127,7 @@ public sealed class BcfSessionBinding : IBinding
     /// TaskCompletionSource a WebView2-hosted ResolveProjectPick call resolves). That pattern
     /// relies on being able to make a second native-JS call while the first is still pending, which
     /// ArchiCAD's DG::Browser/ACAPI bridge does not reliably support - confirmed live
-    /// (REDACTED-internal-ip, 2026-08-12): even with each binding method registered as its own
+    /// (the remote test machine, 2026-08-12): even with each binding method registered as its own
     /// independent JS::Function (see BcfPalette.cpp's kBindingMethods), a call to
     /// window.bcfSessionBinding.ResolveProjectPick made while window.bcfSessionBinding.Connect's
     /// own native call was still in flight never reached this process's native callback at all - no

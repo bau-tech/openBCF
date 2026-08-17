@@ -73,7 +73,7 @@ internal sealed class BridgeServer
             PipeFraming.WriteFrame(pipe, MessageTypes.BridgeResult, Encoding.Unicode.GetBytes(resultJson));
 
             // Real Win32 named-pipe gotcha (confirmed live on the matching native-side callbacks
-            // pipe, REDACTED-internal-ip, 2026-08-12 - see HelperProcess.cpp's CallbacksServerThreadProc
+            // pipe, the remote test machine, 2026-08-12 - see HelperProcess.cpp's CallbacksServerThreadProc
             // for the full explanation): disposing this server pipe right after WriteFrame can race
             // ahead of the client actually reading that data, making the client see a broken pipe
             // instead of the response. WaitForPipeDrain is PipeStream's equivalent of Win32's

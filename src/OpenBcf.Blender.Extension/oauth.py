@@ -3,9 +3,9 @@ OAuth2 Authorization Code grant (RFC 6749) with dynamic client registration (RFC
 Python-side equivalent of OpenBcf.Core.Protocol.BcfOAuthAuthorizationCodeFlow's "silent"
 credentials path. The BCF API spec has no "password" grant, so signing in still goes through
 this flow even though the user only ever sees a username/password form: the credentials are
-submitted directly to the server's own authorization endpoint (confirmed, for REDACTED-server.invalid's
-bcf-bridge, to be a plain email/password form with no other session/CSRF requirement - see the
-C# implementation's comments) rather than opening a browser.
+submitted directly to the server's own authorization endpoint (confirmed, for the project's
+reference test server's bcf-bridge, to be a plain email/password form with no other session/CSRF
+requirement - see the C# implementation's comments) rather than opening a browser.
 
 Unlike the C# client, there is no interactive-browser-popup fallback here (that needs a local
 HTTP listener + opening a system browser + waiting for the redirect - a real feature, deliberately

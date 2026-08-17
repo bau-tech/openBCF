@@ -8,10 +8,10 @@
 // Manages the out-of-process helper (OpenBcf.ArchiCad29.Helper.exe) that owns .NET/OpenBcf.Core -
 // see this file's header comment history for why .NET cannot be hosted in-process: ArchiCAD cycles
 // Initialize()/FreeData() on this Add-On repeatedly and independently of anything it does (most
-// likely a full .apx DLL unload/reload, confirmed on REDACTED-internal-ip), which a hosted CoreCLR
+// likely a full .apx DLL unload/reload, confirmed on the remote test machine), which a hosted CoreCLR
 // runtime cannot survive.
 //
-// Real, hard-won pivot (REDACTED-internal-ip, 2026-08-12): the first version of this class had the
+// Real, hard-won pivot (the remote test machine, 2026-08-12): the first version of this class had the
 // helper own its own WPF/WebView2 window, reparented (cross-process SetParent) into this Add-On's
 // native DG::Palette. That deadlocked ArchiCAD outright: creating a child window whose parent HWND
 // belongs to a *different process's* thread requires a synchronous cross-process SendMessage to
@@ -65,7 +65,7 @@ public:
 	// Stops the callbacks pipe server's background thread cleanly - call this from an
 	// APINotify_Quit handler (see AddOnMain.cpp). Without this, that thread runs forever, most of
 	// the time blocked inside ConnectNamedPipe waiting for a connection that may never come; a real,
-	// confirmed-live symptom of never calling this (REDACTED-internal-ip, 2026-08-12) is ArchiCAD being
+	// confirmed-live symptom of never calling this (the remote test machine, 2026-08-12) is ArchiCAD being
 	// unable to exit normally, requiring a force-close every time. Safe to call even if Initialize
 	// was never called or already shut down.
 	void Shutdown();
@@ -77,7 +77,7 @@ private:
 	bool ConnectToBridgePipe(void** outPipeHandle);
 	bool LaunchHelperProcess();
 
-	// Real, confirmed-live finding (REDACTED-internal-ip, 2026-08-12): ACAPI's RegisterAsynchJSObject
+	// Real, confirmed-live finding (the remote test machine, 2026-08-12): ACAPI's RegisterAsynchJSObject
 	// callbacks run ON ArchiCAD's main thread despite the "Asynch" name (contrary to this class's
 	// original assumption) - so a plain blocking WriteFile/ReadFile pair in CallBinding deadlocks
 	// the moment the helper's own binding method needs to call back into native itself (e.g.

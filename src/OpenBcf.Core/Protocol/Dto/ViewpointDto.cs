@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace OpenBcf.Core.Protocol.Dto;
 
 /// <summary>
-/// REDACTED-server.invalid's flat ifc_guid-list fields (selection, visibility_exceptions, coloring[].components)
+/// The project's reference test server's flat ifc_guid-list fields (selection, visibility_exceptions, coloring[].components)
 /// are declared as plain string arrays in its own /openapi.json, but at least when the project has a
 /// Speckle bridge, GET responses echo them back as objects (e.g. {"ifc_guid": "...", "speckle_id": "..."})
 /// instead. Without this, deserializing such a viewpoint throws and the whole GET fails.
@@ -76,7 +76,7 @@ internal sealed class ViewpointDto
     [JsonPropertyName("components")]
     public ComponentsDto? Components { get; set; }
 
-    // REDACTED-server.invalid doesn't store viewpoints in the nested shape above at all - its
+    // The project's reference test server doesn't store viewpoints in the nested shape above at all - its
     // ViewpointCreate schema (per /openapi.json) is flat: camera fields sit directly on the
     // viewpoint and selection/visibility_exceptions are plain ifc_guid string arrays instead of
     // Component objects nested under "components". Reading these as a fallback is what lets
@@ -144,7 +144,7 @@ internal sealed class ViewpointWriteDto
     public SnapshotDto? Snapshot { get; set; }
 
     // Not part of the official BCF-API 2.1 ViewpointCreate shape (which nests snapshot_type and
-    // snapshot_data under "snapshot" above) - REDACTED-server.invalid's actual schema (verified against its
+    // snapshot_data under "snapshot" above) - the project's reference test server's actual schema (verified against its
     // /openapi.json) instead expects a flat base64 string under this key and ignores "snapshot"
     // entirely. Sending both covers a spec-compliant server (which ignores the extra field) and
     // this one (which ignores the nested one).
@@ -152,7 +152,7 @@ internal sealed class ViewpointWriteDto
     public string? SnapshotBase64 { get; set; }
 
     // Same dual-shape accommodation as snapshot_base64 above, but for the camera/selection data:
-    // REDACTED-server.invalid's ViewpointCreate (per /openapi.json) stores these as flat top-level fields,
+    // The project's reference test server's ViewpointCreate (per /openapi.json) stores these as flat top-level fields,
     // not nested under perspective_camera/orthogonal_camera/components. Without also sending this
     // shape, the nested fields above get silently dropped by this server and every viewpoint comes
     // back with no camera and no selection on a later GET.

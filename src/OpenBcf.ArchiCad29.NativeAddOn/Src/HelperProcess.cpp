@@ -224,7 +224,7 @@ namespace
 					// modal dialog) can't hang this thread forever. kCbCaptureSnapshotPng needs its
 					// own much longer budget - PollCallbacks' case for it calls
 					// ACAPI_Rendering_PhotoRender (see AddOnMain.cpp), a real photorealistic render
-					// to a temp file, not a cheap viewport grab - confirmed live (REDACTED-internal-ip,
+					// to a temp file, not a cheap viewport grab - confirmed live (the remote test machine,
 					// 2026-08-16) to reliably exceed 5s on a real project (Snowdon Towers/hvac),
 					// which made every "Create New Issue" snapshot step fail with exactly this
 					// thread's disconnect-without-responding path, surfacing client-side as "Pipe
@@ -238,7 +238,7 @@ namespace
 							static_cast<uint32_t>(g_pendingCallback.responsePayload.size()))) {
 							// Real, documented Win32 named-pipe gotcha (and the actual, confirmed root
 							// cause of an intermittent "Pipe closed while reading a frame" failure on
-							// the client - REDACTED-internal-ip, 2026-08-12): DisconnectNamedPipe tears down
+							// the client - the remote test machine, 2026-08-12): DisconnectNamedPipe tears down
 							// the server's end of the pipe immediately, and any data WriteFile just
 							// queued that the client hasn't finished reading yet can be lost - the
 							// client's ReadFile then sees a broken pipe instead of the response.
@@ -497,7 +497,7 @@ namespace
 					break;
 				}
 
-				// Real, confirmed-live finding (REDACTED-internal-ip, 2026-08-12): a call like Connect can
+				// Real, confirmed-live finding (the remote test machine, 2026-08-12): a call like Connect can
 				// legitimately block for as long as the user takes to respond to a project-pick
 				// prompt (see BcfSessionBinding.PickProjectAsync) - pollCallbacks() alone kept
 				// ArchiCAD's ACAPI callbacks serviced during that wait, but never gave ArchiCAD's own

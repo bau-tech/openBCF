@@ -6,7 +6,7 @@
 // Revit/Tekla/Rhino provide - so unlike every other client in this repo, OpenBcf.Core/Dui/
 // Dui.WebView cannot be referenced directly by ACAPI code, and this native Add-On (a plain .apx
 // built from this folder) does not host .NET itself. Real, hard-won finding on the remote test
-// machine (REDACTED-internal-ip, 2026-08-12): ArchiCAD cycles Initialize()/FreeData() on this Add-On
+// machine (2026-08-12): ArchiCAD cycles Initialize()/FreeData() on this Add-On
 // repeatedly and independently of anything it does (most likely a full .apx DLL unload/reload),
 // which a hosted CoreCLR runtime cannot survive - see HelperProcess.h for the full story. Instead,
 // a separate process (src/OpenBcf.ArchiCad29.Helper, a normal .NET apphost referencing

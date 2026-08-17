@@ -18,7 +18,7 @@
          (e.g. -p:TeklaStructuresBinPath=...) if Tekla is installed somewhere other than the
          default below - e.g. a local copy of the reference DLLs when Tekla 2026 itself isn't
          installed on this machine (see [[reference_remote_test_machine]] in project memory: DLLs
-         were pulled from the real 2026 install at REDACTED-internal-ip into .tekla-sdk\2026.0\bin\,
+         were pulled from the real 2026 install on the remote test machine into .tekla-sdk\2026.0\bin\,
          gitignored, not redistributed). -->
     <TeklaStructuresBinPath Condition="'$(TeklaStructuresBinPath)' == ''">$(ProgramFiles)\Tekla Structures\2026.0\bin</TeklaStructuresBinPath>
     <!-- Unlike 2025, Tekla Structures 2026 splits its Open API assemblies across two folders:

@@ -18,7 +18,7 @@
 
 // IO::fileSystem (used in CaptureSnapshotPng to delete the temp render) isn't pulled in
 // transitively by ACAPinc.h/APIdefs.h - caught building against the real DevKit (C2039 "fileSystem
-// is not a member of IO") on the remote test machine (REDACTED-internal-ip).
+// is not a member of IO") on the remote test machine.
 #include "FileSystem.hpp"
 
 #include <cmath>
@@ -379,7 +379,7 @@ namespace
 
 	// Real, documented ACAPI notification (Support/Inc/ACAPinc.h, matches the official
 	// Browser_Control DevKit example's own NotificationHandler exactly) - the actual, confirmed fix
-	// for ArchiCAD never being able to close normally with this Add-On loaded (REDACTED-internal-ip,
+	// for ArchiCAD never being able to close normally with this Add-On loaded (the remote test machine,
 	// 2026-08-12): without ever calling HelperProcess::Shutdown, its callbacks-pipe background
 	// thread (usually blocked inside ConnectNamedPipe) ran forever, with nothing to stop it when
 	// ArchiCAD tried to exit.
@@ -472,7 +472,7 @@ GSErrCode Initialize(void)
 		ACAPI_WriteReport("openBCF: ACAPI_MenuItem_InstallMenuHandler failed", true);
 
 	// Initialize()/FreeData() are NOT a simple "once at Add-On load, once at ArchiCAD exit" pair -
-	// real, observed behaviour on REDACTED-internal-ip (2026-08-12) is that ArchiCAD calls them in a
+	// real, observed behaviour on the remote test machine (2026-08-12) is that ArchiCAD calls them in a
 	// repeating Initialize->FreeData->Initialize->... cycle *without* RegisterInterface repeating,
 	// most likely a full unload/reload of this .apx DLL module rather than a once-per-process
 	// pair. That's exactly what HelperProcess/HelperProcess.h exists to survive: the out-of-process
