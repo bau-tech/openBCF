@@ -1,5 +1,6 @@
 bin/
 obj/
+src/OpenBcf.ArchiCad29.NativeAddOn/build/
 node_modules/
 dist/
 *.user
